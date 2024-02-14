@@ -1,3 +1,6 @@
+MANIFEST.in
+README.md
+requirements.txt
 setup.py
 OctoPrint_Hologram.egg-info/PKG-INFO
 OctoPrint_Hologram.egg-info/SOURCES.txt
