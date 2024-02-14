@@ -5,7 +5,8 @@ $(function() {
         self.snapshotUrl = ko.observable();
         self.updatedImageUrl = ko.observable(); // Will hold the Base64 image data
         self.points = ko.observableArray([]);
-        self.sliderValues = ko.observableArray([50, 50, 50, 50, 50]); // Default slider values
+        // Initialize sliderValues as an array of observable floats
+        self.sliderValues = ko.observableArray([ko.observable(90.0), ko.observable(0.0), ko.observable(0.0), ko.observable(1.0), ko.observable(1.0)]);
 
         self.getSnapshot = function() {
             $.ajax({
@@ -66,11 +67,11 @@ $(function() {
                 contentType: "application/json; charset=UTF-8",
                 data: JSON.stringify({
                     command: "update_image",
-                    value1: self.sliderValues()[0],
-                    value2: self.sliderValues()[1],
-                    value3: self.sliderValues()[2],
-                    value4: self.sliderValues()[3],
-                    value5: self.sliderValues()[4]
+                    value1: self.sliderValues()[0](),
+                    value2: self.sliderValues()[1](),
+                    value3: self.sliderValues()[2](),
+                    value4: self.sliderValues()[3](),
+                    value5: self.sliderValues()[4]()
                 }),
                 success: function(response) {
                     // Update the observable to be the Base64 data URI received from the server

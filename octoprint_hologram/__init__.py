@@ -46,10 +46,35 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         if command == "get_snapshot":
             snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-            if snapshot_url:
+            
+                # Get the plugin's data folder
+            data_folder = self.get_plugin_data_folder()
+            # Define the path to the snapshot file within the plugin's data folder
+            snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+            
+            snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+                
+                
+            # Try to fetch the snapshot
+            try:
+                response = requests.get(snapshot_url, timeout=10)  # Adjust the timeout as needed
+                response.raise_for_status()  # Raise an error for bad responses
+                
+                # Save the fetched snapshot locally for future use
+                with open(snapshot_path, 'wb') as f:
+                    f.write(response.content)
+                
+                # Return the path to the newly saved snapshot
                 return flask.jsonify(url=snapshot_url)
-            else:
-                return flask.make_response("Snapshot URL not configured", 404)
+            except requests.exceptions.RequestException as e:
+                self._logger.error(f"Failed to fetch snapshot from URL, attempting to create a default snapshot: {e}")
+
+            return flask.make_response("Snapshot URL not configured", 404)
+                
+            # if snapshot_url:
+            #     return flask.jsonify(url=snapshot_url)
+            # else:
+            #     return flask.make_response("Snapshot URL not configured", 404)
         
         elif command == "save_points":
             points = data.get("points", [])
