@@ -1,0 +1,32 @@
+<div id="settings_plugin_hologram" class="tab-pane">
+    <h3>Hologram Settings</h3>
+    <button data-bind="click: getSnapshot">Get Snapshot</button>
+    <div>
+        <img id="hologram-snapshot" data-bind="attr:{src: snapshotUrl}, visible: snapshotUrl, event:{click: recordClick}" style="cursor: crosshair;" />
+    </div>
+    <div>
+        Points (click on the image):
+        <ul data-bind="foreach: points">
+            <li>
+                (<span data-bind="text: x"></span>, <span data-bind="text: y"></span>)
+            </li>
+        </ul>
+    </div>
+    <button data-bind="click: savePoints, enable: points().length == 4">Save Points</button>
+    
+    <!-- Sliders for image adjustments -->
+    <div>
+        <h4>Image Adjustments</h4>
+        <div>Value 1: <input type="range" min="0" max="100" data-bind="value: sliderValues()[0], event:{'input': updateImage}"></div>
+        <div>Value 2: <input type="range" min="0" max="100" data-bind="value: sliderValues()[1], event:{'input': updateImage}"></div>
+        <div>Value 3: <input type="range" min="0" max="100" data-bind="value: sliderValues()[2], event:{'input': updateImage}"></div>
+        <div>Value 4: <input type="range" min="0" max="100" data-bind="value: sliderValues()[3], event:{'input': updateImage}"></div>
+        <div>Value 5: <input type="range" min="0" max="100" data-bind="value: sliderValues()[4], event:{'input': updateImage}"></div>
+    </div>
+    
+    <!-- Updated image -->
+    <div>
+        <h4>Updated Image</h4>
+        <img data-bind="attr:{src: updatedImageUrl}, visible: updatedImageUrl" />
+    </div>
+</div>

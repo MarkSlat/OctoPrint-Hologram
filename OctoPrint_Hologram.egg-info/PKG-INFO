@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: OctoPrint-Hologram
+Version: 0.1.0
+Summary: An OctoPrint plugin for generating and displaying holographic renders based on real-time parameters.
+Home-page: https://github.com/yourgithub/octoprint-hologram
+Author: Your Name
+Author-email: you@example.com
+License: AGPLv3

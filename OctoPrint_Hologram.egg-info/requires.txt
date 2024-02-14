@@ -1,0 +1,4 @@
+OctoPrint
+Pillow
+matplotlib
+numpy
