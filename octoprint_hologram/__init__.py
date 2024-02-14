@@ -1,3 +1,4 @@
+import base64
 import json
 import octoprint.plugin
 import flask
@@ -41,6 +42,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
     def on_api_command(self, command, data):
         flask.current_app.logger.info(f"Received command: {command} with data: {data}")
         
+        flask.current_app.logger.info(self.get_plugin_data_folder())
+        
         if command == "get_snapshot":
             snapshot_url = self._settings.global_get(["webcam", "snapshot"])
             if snapshot_url:
@@ -60,29 +63,57 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             self._settings.set(["slider_values"], values)
             self._settings.save()
             
-            v = self._settings.get(["update_image"])
+            v = self._settings.get(["slider_values"])
+            p = self._settings.get(["pixels"])
             
-            flask.current_app.logger.info(f"update_image: {v}")
-            flask.current_app.logger.info(f"update_image 1: {v[1]}")
+            # Convert slider values to float
+            v = [float(val) for val in v]
             
+            flask.current_app.logger.info(f"slider_values: {v}")  # Corrected to log slider values instead of pixels
             
-            arrow_img, pixel_coords = utlis.plot_arrow([0, 230, 0, 230, 0, 250], -8, -90, 0, 0.13)
+            # Generate arrow image and get pixel coordinates
+            arrow_img, pixel_coords = utlis.plot_arrow([0, 230, 0, 230, 0, 250], *v[:4])
             
+            # Fetch the base snapshot
             base_path = self.fetch_snapshot()
-            overlay_path = arrow_img
+            overlay_path = arrow_img  # Assuming this is a path; adjust if it's an image object
             
-            overlay_anchor = pixel_coords
+            # Convert pixel information to coordinate pairs
+            converted_points = [(point['x'], point['y']) for point in p]
             
-            base_anchor = 4
+            # Calculate the center point for the overlay
+            base_anchor = utlis.center_of_quadrilateral(converted_points)
+            scale = v[4]  # Scale for overlay
             
-            scale = 1.45
+            # Combine the base image with the overlay
+            result_image = utlis.overlay_images(base_path, overlay_path, base_anchor, pixel_coords, scale)
             
-            result_image = utlis.overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale)
+            # Before saving the result_image, convert it from RGBA to RGB if necessary
+            if result_image.mode == 'RGBA':
+                result_image = result_image.convert('RGB')
+
             
-            # Here you would add your logic to update the image based on slider values
-            # For now, let's just respond with a placeholder image URL
-            updated_image_url = result_image
-            return flask.jsonify(url=updated_image_url)
+            # Save the updated image to the plugin's data folder and create a URL for it
+            result_image_path = os.path.join(self.get_plugin_data_folder(), 'updated_image.jpg')
+            result_image.save(result_image_path)  # Make sure result_image is a PIL image object
+            
+            # Generate a URL to access the updated image
+            # Note: The actual URL path might vary based on your plugin's routing and configuration
+            # updated_image_url = f"http://{flask.request.host}/plugin/hologram/static/img/updated_image.jpg"
+            
+            # # Return the URL of the updated image to the front end
+            # return flask.jsonify(url=updated_image_url)
+            
+            img_byte_arr = BytesIO()
+            result_image.save(img_byte_arr, format='JPEG')  # Or PNG, depending on your needs
+            img_byte_arr = img_byte_arr.getvalue()
+
+            # Encode the byte stream in Base64
+            img_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
+
+            # Return the Base64-encoded image as part of the JSON response
+            return flask.jsonify(image_data=f"data:image/jpeg;base64,{img_base64}")
+
         
         else:
             self._logger.info(f"Unknown command: {command}")
@@ -90,21 +121,46 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
 
     def fetch_snapshot(self):
-        # Get the snapshot URL from the global settings
-        snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-        if not snapshot_url:
-            self._logger.error("Snapshot URL is not configured.")
-            return None
+        # Get the plugin's data folder
+        data_folder = self.get_plugin_data_folder()
+        # Define the path to the snapshot file within the plugin's data folder
+        snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
         
-        # Try to fetch the snapshot
-        try:
-            response = requests.get(snapshot_url, timeout=10)  # Adjust the timeout as needed
-            response.raise_for_status()  # Raise an error for bad responses
-            return response.content  # Return the content of the response (the image)
-        except requests.exceptions.RequestException as e:
-            self._logger.error(f"Failed to fetch snapshot: {e}")
-            return None       
-
+        # Check if the snapshot file exists locally in the plugin's data folder
+        if os.path.isfile(snapshot_path):
+            self._logger.info("Using local snapshot from plugin data folder.")
+            # If the file exists, return the path to the local file
+            return snapshot_path
+        else:
+            # If the file does not exist locally, proceed to fetch from the configured URL
+            snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+            if snapshot_url:
+                # Try to fetch the snapshot
+                try:
+                    response = requests.get(snapshot_url, timeout=10)  # Adjust the timeout as needed
+                    response.raise_for_status()  # Raise an error for bad responses
+                    
+                    # Save the fetched snapshot locally for future use
+                    with open(snapshot_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Return the path to the newly saved snapshot
+                    return snapshot_path
+                except requests.exceptions.RequestException as e:
+                    self._logger.error(f"Failed to fetch snapshot from URL, attempting to create a default snapshot: {e}")
+            
+            # If URL is not configured or fetching failed, create a default image and save it
+            try:
+                from PIL import Image
+                # Create a default image (you can customize this as per your needs)
+                img = Image.new('RGB', (640, 480), color = (73, 109, 137))
+                img.save(snapshot_path)
+                self._logger.info("Created a default snapshot.")
+                return snapshot_path
+            except Exception as e:
+                self._logger.error(f"Failed to create a default snapshot: {e}")
+                return None
+            
 # Uncomment the below if you have update information
 #     def get_update_information(self):
 #         return {
