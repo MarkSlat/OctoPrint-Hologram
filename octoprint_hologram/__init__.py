@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import octoprint.plugin
 import flask
@@ -6,7 +7,9 @@ import os
 from PIL import Image
 from io import BytesIO
 from octoprint_hologram import utlis
+from octoprint_hologram import gcode_reader
 import requests
+from matplotlib import pyplot as plt
 
 class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.SettingsPlugin,
@@ -25,7 +28,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
     def get_template_configs(self):
         return [
-            dict(type="settings", custom_bindings=True)
+            dict(type="settings", template="hologram_settings.jinja2"),
+            dict(type="tab", template="hologram_tab.jinja2")
         ]
 
     def get_assets(self):
@@ -35,7 +39,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         return {
             'get_snapshot': [],
             'save_points': ['points'],
-            'update_image': ['value1', 'value2', 'value3', 'value4', 'value5']  # New command
+            'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],  # New command
+            'get_base64_image': []
         }
 
 
@@ -139,7 +144,85 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Return the Base64-encoded image as part of the JSON response
             return flask.jsonify(image_data=f"data:image/jpeg;base64,{img_base64}")
 
-        
+        elif command == "get_base64_image":
+            # Path to your image. Replace 'your_image.jpg' with your actual image path
+            image_path = os.path.join(self.get_plugin_data_folder(), 'snapshot.jpg')
+            # gcode_path = os.path.join(self.get_plugin_data_folder(), 'octo.gcode')
+            gcode_path = os.path.join(os.path.dirname(__file__), "static", "octo.gcode")
+            
+            gcode_R = gcode_reader.GcodeReader(filename=gcode_path)
+            
+            fig, ax = gcode_R.plot()
+            
+            v = self._settings.get(["slider_values"])
+            v = [float(val) for val in v]
+            
+            p = self._settings.get(["pixels"])
+            
+            # Convert pixel information to coordinate pairs
+            converted_points = [(point['x'], point['y']) for point in p]
+            
+            # Calculate the center point for the overlay
+            base_anchor = utlis.center_of_quadrilateral(converted_points)            
+
+            # Set axis limits and view
+            ax.set_xlim(0, 230)
+            ax.set_ylim(0, 230)
+            ax.set_zlim(0, 250)
+            ax.view_init(elev=v[0], azim=v[1], roll=v[2])
+
+            # ax.set_proj_type(proj_type='persp', focal_length=1.234)
+            ax.set_proj_type(proj_type='persp', focal_length=v[3])
+
+            # Example usage:
+            x_input = 115
+            y_input = 115
+            z_input = 0
+
+            ax.set_axis_off()
+
+            pixel_coords = utlis.get_pixel_coords(ax, x_input, y_input, z_input)
+            # print("Pixel Coordinates:", pixel_coords)
+            
+            overlay_img = io.BytesIO()
+    
+
+            fig.savefig(overlay_img, format='png', transparent=True)
+            # fig.canvas.print_png(arrow_img)
+
+            # Rewind the buffer to the beginning
+            overlay_img.seek(0)
+
+            # Open the image from the buffer using PIL
+            
+            
+            plt.close()
+            
+            result_image = utlis.overlay_images(image_path, overlay_img, base_anchor, pixel_coords, v[4])
+            # result_image.show()
+            
+            rgb_image = Image.new("RGB", result_image.size)
+            # Paste the result_image onto rgb_image to effectively remove the alpha channel
+            rgb_image.paste(result_image, mask=result_image.split()[3])  # 3 is the index of the alpha channel
+            result_image = rgb_image  # Use this RGB image for further operations
+            
+            img_byte_arr = BytesIO()
+            result_image.save(img_byte_arr, format='JPEG')  # Save the image as JPEG to the BytesIO object
+            img_byte_arr = img_byte_arr.getvalue()  # Get the binary image data from the BytesIO object
+
+            # Encode the binary data to Base64
+            
+            # Format the Base64 string and return it in a JSON respons
+            
+            try:
+                # Open the image, convert it to a Base64 string
+                encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')  # Decode the Base64 bytes to a string
+                # Return the Base64-encoded string
+                return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
+            except Exception as e:
+                self._logger.error(f"Failed to encode image: {e}")
+                return flask.make_response("Failed to process image", 500)
+
         else:
             self._logger.info(f"Unknown command: {command}")
             return flask.jsonify({"error": "Unknown command"}), 400
@@ -201,7 +284,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 #         }
 
 __plugin_name__ = "Hologram Plugin"
-__plugin_pythoncompat__ = ">=2.7,<4"
+__plugin_pythoncompat__ = ">=3.7,<4"
 __plugin_implementation__ = HologramPlugin()
 # __plugin_hooks__ = {
 #     "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information

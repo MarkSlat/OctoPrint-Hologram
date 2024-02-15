@@ -1,10 +1,8 @@
 <div id="tab_plugin_hologram">
-    <form>
-        <input id="value1" type="text" placeholder="Value 1">
-        <input id="value2" type="text" placeholder="Value 2">
-        <input id="value3" type="text" placeholder="Value 3">
-        <input id="value4" type="text" placeholder="Value 4">
-        <button type="button" data-bind="click: generateImage">Generate Image</button>
-    </form>
-    <img id="imageResult" src="" alt="Generated Image will appear here" style="max-width:100%;">
+    <h3>Hologram Settings</h3>
+    <!-- Other elements for points, image adjustments, and displaying the fetched Base64 image -->
+    <button data-bind="click: fetchBase64Image">Fetch and Render Base64 Image</button>
+    <div data-bind="visible: displayImageUrl">
+        <img data-bind="attr: { src: displayImageUrl }" />
+    </div>
 </div>

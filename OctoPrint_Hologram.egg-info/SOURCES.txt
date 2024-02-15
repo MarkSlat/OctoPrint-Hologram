@@ -10,7 +10,9 @@ OctoPrint_Hologram.egg-info/not-zip-safe
 OctoPrint_Hologram.egg-info/requires.txt
 OctoPrint_Hologram.egg-info/top_level.txt
 octoprint_hologram/__init__.py
+octoprint_hologram/gcode_reader.py
 octoprint_hologram/utlis.py
+octoprint_hologram/static/octo.gcode
 octoprint_hologram/static/css/hologram.css
 octoprint_hologram/static/js/hologram.js
 octoprint_hologram/templates/hologram_settings.jinja2

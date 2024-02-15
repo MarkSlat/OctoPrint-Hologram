@@ -12,7 +12,9 @@ plugin_url = "https://github.com/yourgithub/octoprint-hologram"
 plugin_license = "AGPLv3"
 plugin_requires = ["Pillow",
                    "matplotlib",
-                   "numpy"]
+                   "numpy",
+                   "pandas",
+                   "seaborn"]
 
 # Additional package data to install for this plugin. The subfolders "templates", "static" and "translations" will
 # already be installed automatically if they exist.

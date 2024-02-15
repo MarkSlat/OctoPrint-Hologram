@@ -4,9 +4,16 @@ $(function() {
 
         self.snapshotUrl = ko.observable();
         self.updatedImageUrl = ko.observable(); // Will hold the Base64 image data
+        self.displayImageUrl = ko.observable(); // Observable for the dynamically fetched Base64 image
         self.points = ko.observableArray([]);
         // Initialize sliderValues as an array of observable floats
-        self.sliderValues = ko.observableArray([ko.observable(90.0), ko.observable(0.0), ko.observable(0.0), ko.observable(1.0), ko.observable(1.0)]);
+        self.sliderValues = ko.observableArray([
+            ko.observable(90.0), 
+            ko.observable(0.0), 
+            ko.observable(0.0), 
+            ko.observable(1.0), 
+            ko.observable(1.0)
+        ]);
 
         self.getSnapshot = function() {
             $.ajax({
@@ -82,10 +89,30 @@ $(function() {
                 }
             });
         };
+
+        // New function to fetch a Base64-encoded image
+        self.fetchBase64Image = function() {
+            $.ajax({
+                url: API_BASEURL + "plugin/hologram",
+                type: "POST",
+                dataType: "json",
+                contentType: "application/json; charset=UTF-8",
+                data: JSON.stringify({
+                    command: "get_base64_image"
+                }),
+                success: function(response) {
+                    // Assuming the response contains Base64 data under the key 'image_data'
+                    self.displayImageUrl(response.image_data);
+                },
+                error: function() {
+                    alert("Failed to retrieve Base64 image");
+                }
+            });
+        };
     }
 
     OCTOPRINT_VIEWMODELS.push({
         construct: HologramViewModel,
-        elements: ["#settings_plugin_hologram"]
+        elements: ["#settings_plugin_hologram", "#tab_plugin_hologram"]
     });
 });
