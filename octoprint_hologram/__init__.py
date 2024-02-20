@@ -134,7 +134,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Path to your image. Replace 'your_image.jpg' with your actual image path
             image_path = os.path.join(self.get_plugin_data_folder(), 'snapshot.jpg')
             # gcode_path = os.path.join(self.get_plugin_data_folder(), 'octo.gcode')
-            gcode_path = os.path.join(os.path.dirname(__file__), "static", "octo.gcode")
+            gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "octo.gcode")
             
             gcode_R = gcode_reader.GcodeReader(filename=gcode_path)
             
