@@ -6,8 +6,7 @@ import flask
 import os
 from PIL import Image
 from io import BytesIO
-from octoprint_hologram import utlis
-from octoprint_hologram import gcode_reader
+from octoprint_hologram import utils, gcode_reader
 import requests
 from matplotlib import pyplot as plt
 
@@ -43,7 +42,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             'get_base64_image': []
         }
 
-
     def on_api_command(self, command, data):
         flask.current_app.logger.info(f"Received command: {command} with data: {data}")
         
@@ -75,11 +73,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 self._logger.error(f"Failed to fetch snapshot from URL, attempting to create a default snapshot: {e}")
 
             return flask.make_response("Snapshot URL not configured", 404)
-                
-            # if snapshot_url:
-            #     return flask.jsonify(url=snapshot_url)
-            # else:
-            #     return flask.make_response("Snapshot URL not configured", 404)
         
         elif command == "save_points":
             points = data.get("points", [])
@@ -102,7 +95,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             flask.current_app.logger.info(f"slider_values: {v}")  # Corrected to log slider values instead of pixels
             
             # Generate arrow image and get pixel coordinates
-            arrow_img, pixel_coords = utlis.plot_arrow([0, 230, 0, 230, 0, 250], *v[:4])
+            arrow_img, pixel_coords = utils.plot_arrow([0, 230, 0, 230, 0, 250], *v[:4])
             
             # Fetch the base snapshot
             base_path = self.fetch_snapshot()
@@ -112,11 +105,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             converted_points = [(point['x'], point['y']) for point in p]
             
             # Calculate the center point for the overlay
-            base_anchor = utlis.center_of_quadrilateral(converted_points)
+            base_anchor = utils.center_of_quadrilateral(converted_points)
             scale = v[4]  # Scale for overlay
             
             # Combine the base image with the overlay
-            result_image = utlis.overlay_images(base_path, overlay_path, base_anchor, pixel_coords, scale)
+            result_image = utils.overlay_images(base_path, overlay_path, base_anchor, pixel_coords, scale)
             
             # Before saving the result_image, convert it from RGBA to RGB if necessary
             if result_image.mode == 'RGBA':
@@ -126,13 +119,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Save the updated image to the plugin's data folder and create a URL for it
             result_image_path = os.path.join(self.get_plugin_data_folder(), 'updated_image.jpg')
             result_image.save(result_image_path)  # Make sure result_image is a PIL image object
-            
-            # Generate a URL to access the updated image
-            # Note: The actual URL path might vary based on your plugin's routing and configuration
-            # updated_image_url = f"http://{flask.request.host}/plugin/hologram/static/img/updated_image.jpg"
-            
-            # # Return the URL of the updated image to the front end
-            # return flask.jsonify(url=updated_image_url)
             
             img_byte_arr = BytesIO()
             result_image.save(img_byte_arr, format='JPEG')  # Or PNG, depending on your needs
@@ -163,7 +149,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             converted_points = [(point['x'], point['y']) for point in p]
             
             # Calculate the center point for the overlay
-            base_anchor = utlis.center_of_quadrilateral(converted_points)            
+            base_anchor = utils.center_of_quadrilateral(converted_points)            
 
             # Set axis limits and view
             ax.set_xlim(0, 230)
@@ -181,7 +167,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
             ax.set_axis_off()
 
-            pixel_coords = utlis.get_pixel_coords(ax, x_input, y_input, z_input)
+            pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
             # print("Pixel Coordinates:", pixel_coords)
             
             overlay_img = io.BytesIO()
@@ -192,13 +178,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
             # Rewind the buffer to the beginning
             overlay_img.seek(0)
-
-            # Open the image from the buffer using PIL
-            
             
             plt.close()
-            
-            result_image = utlis.overlay_images(image_path, overlay_img, base_anchor, pixel_coords, v[4])
+
+            result_image = utils.overlay_images(image_path, overlay_img, base_anchor, pixel_coords, v[4])
             # result_image.show()
             
             rgb_image = Image.new("RGB", result_image.size)

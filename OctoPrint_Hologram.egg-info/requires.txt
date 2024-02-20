@@ -1,6 +1,0 @@
-OctoPrint
-Pillow
-matplotlib
-numpy
-pandas
-seaborn

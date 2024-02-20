@@ -6,9 +6,9 @@ plugin_package = "octoprint_%s" % plugin_identifier
 plugin_name = "OctoPrint-Hologram"
 plugin_version = "0.1.0"
 plugin_description = "An OctoPrint plugin for generating and displaying holographic renders based on real-time parameters."
-plugin_author = "Your Name"
+plugin_author = "Mark"
 plugin_author_email = "you@example.com"
-plugin_url = "https://github.com/yourgithub/octoprint-hologram"
+plugin_url = "https://github.com/MarkSlat/OctoPrint-Hologram"
 plugin_license = "AGPLv3"
 plugin_requires = ["Pillow",
                    "matplotlib",

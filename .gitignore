@@ -4,5 +4,6 @@
 *.iml
 build
 dist
-*.egg*
+# *.egg*
 .DS_Store
+*.zip
