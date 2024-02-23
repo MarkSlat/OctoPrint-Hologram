@@ -4,7 +4,7 @@ This plugin allows a user to an accurate preview of their print projected onto t
 
 Example Usage
 -------------
-![demo](octoprint_hologram\static\assets\Demo.png)
+![demo](octoprint_hologram/static/assets/Demo.png)
 
 Future plans
 ------------
