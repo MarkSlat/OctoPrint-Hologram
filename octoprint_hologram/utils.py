@@ -37,6 +37,13 @@ def plot_arrow(grid_limits, elev, azim, roll, focal_length):
     # Plot the arrow
     ax.quiver(x_tail, y_tail, z_tail, U, V, W, color='r', arrow_length_ratio=0.2, pivot='tail')
 
+    # Calculate required aspect ratio for equal scaling
+    x_range = grid_limits[1] - grid_limits[0]
+    y_range = grid_limits[3] - grid_limits[2]
+    z_range = grid_limits[5] - grid_limits[4]
+    max_range = max(x_range, y_range, z_range)
+    ax.set_box_aspect([x_range/max_range, y_range/max_range, z_range/max_range])
+
     # Set plot limits
     ax.set_xlim([grid_limits[0], grid_limits[1]])
     ax.set_ylim([grid_limits[2], grid_limits[3]])
@@ -49,7 +56,7 @@ def plot_arrow(grid_limits, elev, azim, roll, focal_length):
     ax.plot([grid_limits[0], grid_limits[1]], [grid_limits[3], grid_limits[3]], [grid_limits[4], grid_limits[4]], color='b')
 
     ax.set_axis_off()
-    
+
     ax.set_proj_type(proj_type='persp', focal_length=focal_length)
 
     x_input = grid_limits[1]/2
@@ -61,11 +68,9 @@ def plot_arrow(grid_limits, elev, azim, roll, focal_length):
     pixel_coords = get_pixel_coords(ax, x_input, y_input, z_input)
 
     arrow_img = io.BytesIO()
-
     fig.savefig(arrow_img, format='png', transparent=True)
-
     arrow_img.seek(0)
-    
+
     plt.close()
     
     return arrow_img, pixel_coords
@@ -94,6 +99,8 @@ def center_of_quadrilateral(points):
     return (intersection_x, intersection_y)
 
 def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1.0):
+    scale = math.sqrt(scale ** 2 / 2)
+    
     # Load the base image in RGBA mode for transparency handling
     base_image = Image.open(base_path).convert("RGBA")
     
