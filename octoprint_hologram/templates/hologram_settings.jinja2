@@ -1,5 +1,16 @@
 <div id="settings_plugin_hologram" class="tab-pane">
+    
     <h3>Hologram Settings</h3>
+
+    <div>
+        <h4>Printer Dimensions</h4>
+        <div>Length: <input type="number" step="1" data-bind="value: printerLength"></div>
+        <div>Width: <input type="number" step="1" data-bind="value: printerWidth"></div>
+        <div>Depth: <input type="number" step="1" data-bind="value: printerDepth"></div>
+        <!-- Button to send dimensions -->
+        <button data-bind="click: sendPrinterDimensions">Update Printer Dimensions</button>
+    </div>
+
     <button data-bind="click: getSnapshot">Get Snapshot</button>
     <div>
         <img id="hologram-snapshot" data-bind="attr:{src: snapshotUrl}, visible: snapshotUrl, event:{click: recordClick}" style="cursor: crosshair;" />
@@ -13,15 +24,25 @@
         </ul>
     </div>
     <button data-bind="click: savePoints, enable: points().length == 4">Save Points</button>
-    
+   
     <!-- Sliders for image adjustments -->
-    <div>
+    <div class="adjustment-sliders">
         <h4>Image Adjustments</h4>
-        <div>Elev: <input type="range" min="0" max="100" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}"></div>
-        <div>Azim: <input type="range" min="0" max="100" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[1](parseFloat(event.target.value)); updateImage();}}"></div>
-        <div>Roll: <input type="range" min="-30" max="30" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[2](parseFloat(event.target.value)); updateImage();}}"></div>
-        <div>Focal length: <input type="range" min="0.01" max="1" step="0.001" data-bind="event:{'input': function(data, event) {sliderValues()[3](parseFloat(event.target.value)); updateImage();}}"></div>
-        <div>Scale: <input type="range" min="0" max="5" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[4](parseFloat(event.target.value)); updateImage();}}"></div>
+        <div class="slider-container">
+            Elev: <input type="range" min="0" max="100" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}">
+        </div>
+        <div class="slider-container">
+            Azim: <input type="range" min="0" max="100" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[1](parseFloat(event.target.value)); updateImage();}}">
+        </div>
+        <div class="slider-container">
+            Roll: <input type="range" min="-30" max="30" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[2](parseFloat(event.target.value)); updateImage();}}">
+        </div>
+        <div class="slider-container">
+            Focal length: <input type="range" min="0.01" max="1" step="0.001" data-bind="event:{'input': function(data, event) {sliderValues()[3](parseFloat(event.target.value)); updateImage();}}">
+        </div>
+        <div class="slider-container">
+            Scale: <input type="range" min="0" max="5" step="0.01" data-bind="event:{'input': function(data, event) {sliderValues()[4](parseFloat(event.target.value)); updateImage();}}">
+        </div>
     </div>
     
     <!-- Updated image -->
