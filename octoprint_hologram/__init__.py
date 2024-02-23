@@ -19,7 +19,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
     def get_settings_defaults(self):
         return {
             "pixels": [],  # Default empty list to store pixel values
-            "slider_values": [50, 50, 50, 50, 50]  # Default values for sliders
+            "slider_values": [50, 50, 50, 50, 50],  # Default values for sliders
+            "printerLength": 0,  # Default length
+            "printerWidth": 0,  # Default width
+            "printerDepth": 0
         }
 
     def on_after_startup(self):
@@ -39,7 +42,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             'get_snapshot': [],
             'save_points': ['points'],
             'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],  # New command
-            'get_base64_image': []
+            'get_base64_image': [],
+            'process_gcode' : ['gcodeFilePath'],
+            'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']  # New command
         }
 
     def on_api_command(self, command, data):
@@ -72,6 +77,23 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
             return flask.make_response("Snapshot URL not configured", 404)
         
+        elif command == "update_printer_dimensions":
+            # Extract printer dimensions from the data
+            printer_length = data.get('printerLength')
+            printer_width = data.get('printerWidth')
+            printer_depth = data.get('printerDepth')
+            
+            # Update the plugin's settings with the new dimensions
+            self._settings.set(["printerLength"], printer_length)
+            self._settings.set(["printerWidth"], printer_width)
+            self._settings.set(["printerDepth"], printer_depth)
+            self._settings.save()
+            
+            # Optionally, log this update for verification
+            # self._logger.info(f"Updated printer dimensions to Length: {printer_length}, Width: {printer_width}, Depth: {printer_depth}")
+            
+            return flask.jsonify({"result": "success", "message": "Printer dimensions updated successfully"})
+                
         elif command == "save_points":
             points = data.get("points", [])
             self._settings.set(["pixels"], points)
@@ -90,10 +112,12 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Convert slider values to float
             v = [float(val) for val in v]
             
-            flask.current_app.logger.info(f"slider_values: {v}")  # Corrected to log slider values instead of pixels
+            printer_length = int(self._settings.get(["printerLength"]))
+            printer_width = int(self._settings.get(["printerWidth"]))
+            printer_depth = int(self._settings.get(["printerDepth"]))
             
             # Generate arrow image and get pixel coordinates
-            arrow_img, pixel_coords = utils.plot_arrow([0, 230, 0, 230, 0, 250], *v[:4])
+            arrow_img, pixel_coords = utils.plot_arrow([0, printer_length, 0, printer_width, 0, printer_depth], *v[:4])
             
             # Fetch the base snapshot
             base_path = self.fetch_snapshot()
@@ -132,7 +156,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Path to your image. Replace 'your_image.jpg' with your actual image path
             image_path = os.path.join(self.get_plugin_data_folder(), 'snapshot.jpg')
             # gcode_path = os.path.join(self.get_plugin_data_folder(), 'octo.gcode')
-            gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "octo.gcode")
+            gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "CE3_3DBenchy.gcode")
             
             gcode_R = gcode_reader.GcodeReader(filename=gcode_path)
             
@@ -150,23 +174,28 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             base_anchor = utils.center_of_quadrilateral(converted_points)            
 
             # Set axis limits and view
-            ax.set_xlim(0, 230)
-            ax.set_ylim(0, 230)
-            ax.set_zlim(0, 250)
+            printer_length = int(self._settings.get(["printerLength"]))
+            printer_width = int(self._settings.get(["printerWidth"]))
+            printer_depth = int(self._settings.get(["printerDepth"]))
+            
+            # Calculate required aspect ratio for equal scaling
+            max_range = max(printer_length, printer_width, printer_depth)
+            ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
+            
+            ax.set_xlim(0, printer_length)
+            ax.set_ylim(0, printer_width)
+            ax.set_zlim(0, printer_depth)
             ax.view_init(elev=v[0], azim=v[1], roll=v[2])
 
-            # ax.set_proj_type(proj_type='persp', focal_length=1.234)
             ax.set_proj_type(proj_type='persp', focal_length=v[3])
 
-            # Example usage:
-            x_input = 115
-            y_input = 115
+            x_input = printer_length/2
+            y_input = printer_width/2
             z_input = 0
 
             ax.set_axis_off()
 
             pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
-            # print("Pixel Coordinates:", pixel_coords)
             
             overlay_img = io.BytesIO()
     
@@ -183,22 +212,18 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # result_image.show()
             
             rgb_image = Image.new("RGB", result_image.size)
-            # Paste the result_image onto rgb_image to effectively remove the alpha channel
-            rgb_image.paste(result_image, mask=result_image.split()[3])  # 3 is the index of the alpha channel
-            result_image = rgb_image  # Use this RGB image for further operations
+
+            rgb_image.paste(result_image, mask=result_image.split()[3])
+            result_image = rgb_image
             
             img_byte_arr = BytesIO()
-            result_image.save(img_byte_arr, format='JPEG')  # Save the image as JPEG to the BytesIO object
-            img_byte_arr = img_byte_arr.getvalue()  # Get the binary image data from the BytesIO object
-
-            # Encode the binary data to Base64
-            
-            # Format the Base64 string and return it in a JSON respons
+            result_image.save(img_byte_arr, format='JPEG')
+            img_byte_arr = img_byte_arr.getvalue()
             
             try:
-                # Open the image, convert it to a Base64 string
-                encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')  # Decode the Base64 bytes to a string
-                # Return the Base64-encoded string
+
+                encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
+
                 return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
             except Exception as e:
                 self._logger.error(f"Failed to encode image: {e}")
