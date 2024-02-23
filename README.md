@@ -1,57 +1,17 @@
-OctoPrint Plugin Skeleton
+OctoPrint Hologram plugin
 =========================
-
-This is a basic plugin skeleton that you can use as a basis for your own OctoPrint plugin.
-
-You can copy the files to a folder of your choice, or just clone this repository, renaming it in the process. Then 
-modify ``setup.py`` to fit your plugin, rename ``octoprint_skeleton`` accordingly and finally implement your plugin 
-under ``octoprint_<plugin identifier>``.
+This plugin allows a user to an accurate preview of their print projected onto the build plate.
 
 Example Usage
 -------------
+![demo](octoprint_hologram\static\assets\Demo.png)
 
-Clone your repository into a new development directory and rename ``octoprint_skeleton``:
+Future plans
+------------
+To automatically detect failures and defects in real-time by cross comparing the rendered model with the actual print, layer by layer.
+Apon detection it will send a notification and pause/stop the print job.
 
-    git clone https://github.com/OctoPrint/OctoPrint-PluginSkeleton OctoPrint-MyNewPlugin
-    cd OctoPrint-MyNewPlugin
-    mv octoprint_skeleton octoprint_mynewplugin
-
-Modify `setup.py`'s `plugin_<xyz>` settings so that they match your plugin, e.g.:
-
-``` python
-plugin_identifier = "mynewplugin"
-plugin_name = "OctoPrint-MyNewPlugin"
-plugin_version = "1.0"
-plugin_description = "Awesome plugin that does something"
-plugin_author = "You"
-plugin_author_email = "you@somewhere.net"
-plugin_url = "https://github.com/you/OctoPrint-MyNewPlugin"
-```
-
-Then implement your plugin under ``octoprint_mynewplugin`` (don't forget to adjust ``__init__.py``!), e.g.:
-
-``` python
-# coding=utf-8
-from __future__ import absolute_import
-
-import octoprint.plugin
-
-class HelloWorldPlugin(octoprint.plugin.StartupPlugin):
-    def on_after_startup(self):
-        self._logger.info("Hello World!")
-        
-__plugin_name__ = "Hello World"
-__plugin_implementation__ = HelloWorldPlugin()
-```
-
-Test it (e.g. via ``python setup.py develop``). If everything works, write a nice ``README.md``, replacing the existing one.
-Commit your code, then push it to your plugin's repository (this assumes you already created it on Github as
-``you/OctoPrint-MyNewPlugin``), e.g.:
-
-    git commit -a -m "Initial commit of MyNewPlugin"
-    git remote set-url origin git@github.com:you/OctoPrint-MyNewPlugin.git
-    git push -u origin master
-
-Congratulations, you are now the proud maintainer of a new OctoPrint plugin! :) Don't forget to add an entry to the
-[wiki](https://github.com/foosel/OctoPrint/wiki#plugins) once it's suitable for general consumption, so that others
-may find it!
+Acknowledgments
+-------------
+I would like to give credit Yaqi Zhang’s for using their script for part of the Gcode rendering function.
+https://github.com/zhangyaqi1989/Gcode-Reader
