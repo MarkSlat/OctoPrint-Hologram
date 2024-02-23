@@ -43,10 +43,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         }
 
     def on_api_command(self, command, data):
-        flask.current_app.logger.info(f"Received command: {command} with data: {data}")
-        
-        flask.current_app.logger.info(self.get_plugin_data_folder())
-        
+        # flask.current_app.logger.info(f"Received command: {command} with data: {data}")
+       
         if command == "get_snapshot":
             snapshot_url = self._settings.global_get(["webcam", "snapshot"])
             
@@ -206,6 +204,16 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 self._logger.error(f"Failed to encode image: {e}")
                 return flask.make_response("Failed to process image", 500)
 
+        elif command == "process_gcode":
+            gcode_path = data.get("gcodeFilePath", "")
+            # Here you can add the logic to process the G-code file
+            # For simplicity, this example just logs the file path
+            self._logger.info(f"Processing G-code file at: {gcode_path}")
+            # Implement your G-code processing logic here
+            # After processing, you can return a success message or any result of the processing
+            return flask.jsonify({"result": "success", "message": "G-code file processed successfully"})
+
+
         else:
             self._logger.info(f"Unknown command: {command}")
             return flask.jsonify({"error": "Unknown command"}), 400
@@ -253,22 +261,22 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 return None
             
 # Uncomment the below if you have update information
-#     def get_update_information(self):
-#         return {
-#             "hologram": {
-#                 "displayName": "Hologram Plugin",
-#                 "displayVersion": self._plugin_version,
-#                 "type": "github_release",
-#                 "user": "YourGithubUsername",
-#                 "repo": "OctoPrint-Hologram",
-#                 "current": self._plugin_version,
-#                 "pip": "https://github.com/YourGithubUsername/OctoPrint-Hologram/archive/{target_version}.zip"
-#             }
-#         }
+    def get_update_information(self):
+        return {
+            "hologram": {
+                "displayName": "Hologram Plugin",
+                "displayVersion": self._plugin_version,
+                "type": "github_release",
+                "user": "MarkSlat",
+                "repo": "OctoPrint-Hologram",
+                "current": self._plugin_version,
+                # "pip": "https://github.com/MarkSlat/OctoPrint-Hologram/archive/{target_version}.zip"
+            }
+        }
 
 __plugin_name__ = "Hologram Plugin"
 __plugin_pythoncompat__ = ">=3.7,<4"
 __plugin_implementation__ = HologramPlugin()
-# __plugin_hooks__ = {
-#     "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
-# }
+__plugin_hooks__ = {
+    "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+}
