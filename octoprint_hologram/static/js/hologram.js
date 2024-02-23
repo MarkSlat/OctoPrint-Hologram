@@ -115,23 +115,23 @@ $(function() {
             });
         };
 
-        self.fetchBase64Image = function() {
-            $.ajax({
-                url: API_BASEURL + "plugin/hologram",
-                type: "POST",
-                dataType: "json",
-                contentType: "application/json; charset=UTF-8",
-                data: JSON.stringify({
-                    command: "get_base64_image"
-                }),
-                success: function(response) {
-                    self.displayImageUrl(response.image_data);
-                },
-                error: function() {
-                    console.error("Failed to retrieve Base64 image");
-                }
-            });
-        };
+        // self.fetchBase64Image = function() {
+        //     $.ajax({
+        //         url: API_BASEURL + "plugin/hologram",
+        //         type: "POST",
+        //         dataType: "json",
+        //         contentType: "application/json; charset=UTF-8",
+        //         data: JSON.stringify({
+        //             command: "get_base64_image"
+        //         }),
+        //         success: function(response) {
+        //             self.displayImageUrl(response.image_data);
+        //         },
+        //         error: function() {
+        //             console.error("Failed to retrieve Base64 image");
+        //         }
+        //     });
+        // };
 
         self.fromHistoryData = function(data) {
             if(!viewInitialized)
@@ -146,7 +146,7 @@ $(function() {
         }
 
         // Method to send G-code file information to the backend
-        self.sendGcodeFileToBackend = function() {
+        self.fetchRender = function() {
             const filePath = `/downloads/files/local/${curJobName}`; // Adjust if the path is different
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
@@ -154,10 +154,11 @@ $(function() {
                 dataType: "json",
                 contentType: "application/json; charset=UTF-8",
                 data: JSON.stringify({
-                    command: "process_gcode",
+                    command: "fetchRender",
                     gcodeFilePath: filePath
                 }),
                 success: function(response) {
+                    self.displayImageUrl(response.image_data);
                     console.log("G-code file successfully processed by the backend.", response);
                     // Additional actions based on the response
                 },

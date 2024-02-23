@@ -36,14 +36,15 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
     def get_assets(self):
         return dict(js=["js/hologram.js"])
+        
 
     def get_api_commands(self):
         return {
             'get_snapshot': [],
             'save_points': ['points'],
             'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],  # New command
-            'get_base64_image': [],
-            'process_gcode' : ['gcodeFilePath'],
+            # 'get_base64_image': [],
+            'fetchRender' : ['gcodeFilePath'],
             'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']  # New command
         }
 
@@ -152,11 +153,16 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             # Return the Base64-encoded image as part of the JSON response
             return flask.jsonify(image_data=f"data:image/jpeg;base64,{img_base64}")
 
-        elif command == "get_base64_image":
+        elif command == "fetchRender":
+            
+            gcode_path = data.get("gcodeFilePath", "")
+            
+            if gcode_path == "/downloads/files/local/":
+                return flask.make_response("Failed to process image", 500)
+            
             # Path to your image. Replace 'your_image.jpg' with your actual image path
             image_path = os.path.join(self.get_plugin_data_folder(), 'snapshot.jpg')
-            # gcode_path = os.path.join(self.get_plugin_data_folder(), 'octo.gcode')
-            gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "CE3_3DBenchy.gcode")
+            # gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "CE3_3DBenchy.gcode")
             
             gcode_R = gcode_reader.GcodeReader(filename=gcode_path)
             
@@ -229,14 +235,14 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 self._logger.error(f"Failed to encode image: {e}")
                 return flask.make_response("Failed to process image", 500)
 
-        elif command == "process_gcode":
-            gcode_path = data.get("gcodeFilePath", "")
-            # Here you can add the logic to process the G-code file
-            # For simplicity, this example just logs the file path
-            self._logger.info(f"Processing G-code file at: {gcode_path}")
-            # Implement your G-code processing logic here
-            # After processing, you can return a success message or any result of the processing
-            return flask.jsonify({"result": "success", "message": "G-code file processed successfully"})
+        # elif command == "process_gcode":
+        #     gcode_path = data.get("gcodeFilePath", "")
+        #     # Here you can add the logic to process the G-code file
+        #     # For simplicity, this example just logs the file path
+        #     self._logger.info(f"Processing G-code file at: {gcode_path}")
+        #     # Implement your G-code processing logic here
+        #     # After processing, you can return a success message or any result of the processing
+        #     return flask.jsonify({"result": "success", "message": "G-code file processed successfully"})
 
 
         else:
