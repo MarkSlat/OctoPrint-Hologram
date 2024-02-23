@@ -1,5 +1,14 @@
-div.ui-pnotify.bedready_notice > div.ui-pnotify-container > div.ui-pnotify-icon > span.icon-warning-sign,
-div.ui-pnotify.bedready_notice > div.ui-pnotify-container > div.ui-pnotify-icon > span.icon-info-sign
-{
-    padding-top: 3px;
+.slider-container {
+    display: inline-block;
+    transform: rotate(270deg);
+    transform-origin: right top;
+    /* Adjust the margin and position as needed to align with your image */
+    margin-right: 20px;
+    margin-top: 20px;
+    position: relative;
+}
+
+/* Adjust the width of the slider container to match the height of your sliders */
+.slider-container input[type="range"] {
+    width: 200px; /* This width becomes the "height" of the vertical slider */
 }
