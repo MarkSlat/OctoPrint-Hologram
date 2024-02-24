@@ -8,8 +8,8 @@ $(function() {
         self.printerWidth = ko.observable();
         self.printerDepth = ko.observable();
         self.snapshotUrl = ko.observable();
-        self.updatedImageUrl = ko.observable(); // Will hold the Base64 image data
-        self.displayImageUrl = ko.observable(); // Observable for the dynamically fetched Base64 image
+        self.updatedImageUrl = ko.observable();
+        self.displayImageUrl = ko.observable();
         self.points = ko.observableArray([]);
         self.sliderValues = ko.observableArray([
             ko.observable(90.0), 
@@ -114,24 +114,6 @@ $(function() {
                 }
             });
         };
-
-        // self.fetchBase64Image = function() {
-        //     $.ajax({
-        //         url: API_BASEURL + "plugin/hologram",
-        //         type: "POST",
-        //         dataType: "json",
-        //         contentType: "application/json; charset=UTF-8",
-        //         data: JSON.stringify({
-        //             command: "get_base64_image"
-        //         }),
-        //         success: function(response) {
-        //             self.displayImageUrl(response.image_data);
-        //         },
-        //         error: function() {
-        //             console.error("Failed to retrieve Base64 image");
-        //         }
-        //     });
-        // };
 
         self.fromHistoryData = function(data) {
             if(!viewInitialized)

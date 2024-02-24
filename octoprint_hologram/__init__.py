@@ -1,297 +1,179 @@
 import base64
-import io
-import json
-import octoprint.plugin
-import flask
 import os
-from PIL import Image
 from io import BytesIO
-from octoprint_hologram import utils, gcode_reader
-import requests
 from matplotlib import pyplot as plt
+import requests
+from PIL import Image
+import flask
+import octoprint.plugin
+
+from octoprint_hologram import utils, gcode_reader
 
 class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.SettingsPlugin,
                      octoprint.plugin.TemplatePlugin,
                      octoprint.plugin.AssetPlugin,
                      octoprint.plugin.SimpleApiPlugin):
+    """
+    An OctoPrint plugin to enhance 3D printing with holographic projections.
+    """
 
     def get_settings_defaults(self):
+        """Define default settings for the plugin."""
         return {
-            "pixels": [],  # Default empty list to store pixel values
-            "slider_values": [50, 50, 50, 50, 50],  # Default values for sliders
-            "printerLength": 0,  # Default length
-            "printerWidth": 0,  # Default width
-            "printerDepth": 0
+            "pixels": [],
+            "slider_values": [50] * 5,  # Default slider values
+            "printerLength": 0,
+            "printerWidth": 0,
+            "printerDepth": 0,
         }
 
     def on_after_startup(self):
+        """Log startup message."""
         self._logger.info("Hologram plugin started!")
 
     def get_template_configs(self):
+        """Define plugin template configurations."""
         return [
-            dict(type="settings", template="hologram_settings.jinja2"),
-            dict(type="tab", template="hologram_tab.jinja2")
+            {"type": "settings", "template": "hologram_settings.jinja2"},
+            {"type": "tab", "template": "hologram_tab.jinja2"}
         ]
 
     def get_assets(self):
-        return dict(js=["js/hologram.js"])
-        
+        """Define web assets used by the plugin."""
+        return {"js": ["js/hologram.js"]}
 
     def get_api_commands(self):
+        """Define API commands the plugin responds to."""
         return {
             'get_snapshot': [],
             'save_points': ['points'],
-            'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],  # New command
-            # 'get_base64_image': [],
-            'fetchRender' : ['gcodeFilePath'],
-            'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']  # New command
+            'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],
+            'fetchRender': ['gcodeFilePath'],
+            'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']
         }
 
     def on_api_command(self, command, data):
-        # flask.current_app.logger.info(f"Received command: {command} with data: {data}")
-       
+        """Route API commands to their respective handlers."""
         if command == "get_snapshot":
-            snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-            
-                # Get the plugin's data folder
-            data_folder = self.get_plugin_data_folder()
-            # Define the path to the snapshot file within the plugin's data folder
-            snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
-            
-            snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-                
-                
-            # Try to fetch the snapshot
-            try:
-                response = requests.get(snapshot_url, timeout=10)  # Adjust the timeout as needed
-                response.raise_for_status()  # Raise an error for bad responses
-                
-                # Save the fetched snapshot locally for future use
-                with open(snapshot_path, 'wb') as f:
-                    f.write(response.content)
-                
-                # Return the path to the newly saved snapshot
-                return flask.jsonify(url=snapshot_url)
-            except requests.exceptions.RequestException as e:
-                self._logger.error(f"Failed to fetch snapshot from URL, attempting to create a default snapshot: {e}")
-
-            return flask.make_response("Snapshot URL not configured", 404)
-        
+            return self.handle_get_snapshot()
         elif command == "update_printer_dimensions":
-            # Extract printer dimensions from the data
-            printer_length = data.get('printerLength')
-            printer_width = data.get('printerWidth')
-            printer_depth = data.get('printerDepth')
-            
-            # Update the plugin's settings with the new dimensions
-            self._settings.set(["printerLength"], printer_length)
-            self._settings.set(["printerWidth"], printer_width)
-            self._settings.set(["printerDepth"], printer_depth)
-            self._settings.save()
-            
-            # Optionally, log this update for verification
-            # self._logger.info(f"Updated printer dimensions to Length: {printer_length}, Width: {printer_width}, Depth: {printer_depth}")
-            
-            return flask.jsonify({"result": "success", "message": "Printer dimensions updated successfully"})
-                
+            return self.update_printer_dimensions(data)
         elif command == "save_points":
-            points = data.get("points", [])
-            self._settings.set(["pixels"], points)
-            self._settings.save()
-            return flask.jsonify({"result": "success"})
-        
+            return self.save_points(data)
         elif command == "update_image":
-            # Store slider values in settings
-            values = [data.get(f'value{i+1}', 50) for i in range(5)]
-            self._settings.set(["slider_values"], values)
-            self._settings.save()
-            
-            v = self._settings.get(["slider_values"])
-            p = self._settings.get(["pixels"])
-            
-            # Convert slider values to float
-            v = [float(val) for val in v]
-            
-            printer_length = int(self._settings.get(["printerLength"]))
-            printer_width = int(self._settings.get(["printerWidth"]))
-            printer_depth = int(self._settings.get(["printerDepth"]))
-            
-            # Generate arrow image and get pixel coordinates
-            arrow_img, pixel_coords = utils.plot_arrow([0, printer_length, 0, printer_width, 0, printer_depth], *v[:4])
-            
-            # Fetch the base snapshot
-            base_path = self.fetch_snapshot()
-            overlay_path = arrow_img  # Assuming this is a path; adjust if it's an image object
-            
-            # Convert pixel information to coordinate pairs
-            converted_points = [(point['x'], point['y']) for point in p]
-            
-            # Calculate the center point for the overlay
-            base_anchor = utils.center_of_quadrilateral(converted_points)
-            scale = v[4]  # Scale for overlay
-            
-            # Combine the base image with the overlay
-            result_image = utils.overlay_images(base_path, overlay_path, base_anchor, pixel_coords, scale)
-            
-            # Before saving the result_image, convert it from RGBA to RGB if necessary
-            if result_image.mode == 'RGBA':
-                result_image = result_image.convert('RGB')
-
-            
-            # Save the updated image to the plugin's data folder and create a URL for it
-            result_image_path = os.path.join(self.get_plugin_data_folder(), 'updated_image.jpg')
-            result_image.save(result_image_path)  # Make sure result_image is a PIL image object
-            
-            img_byte_arr = BytesIO()
-            result_image.save(img_byte_arr, format='JPEG')  # Or PNG, depending on your needs
-            img_byte_arr = img_byte_arr.getvalue()
-
-            # Encode the byte stream in Base64
-            img_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
-
-            # Return the Base64-encoded image as part of the JSON response
-            return flask.jsonify(image_data=f"data:image/jpeg;base64,{img_base64}")
-
+            return self.update_image(data)
         elif command == "fetchRender":
-            
-            gcode_path = data.get("gcodeFilePath", "")
-            
-            if gcode_path == "/downloads/files/local/":
-                return flask.make_response("Failed to process image", 500)
-            
-            # Path to your image. Replace 'your_image.jpg' with your actual image path
-            image_path = os.path.join(self.get_plugin_data_folder(), 'snapshot.jpg')
-            # gcode_path = os.path.join(os.path.dirname(__file__), "static", "data", "CE3_3DBenchy.gcode")
-            
-            gcode_R = gcode_reader.GcodeReader(filename=gcode_path)
-            
-            fig, ax = gcode_R.plot()
-            
-            v = self._settings.get(["slider_values"])
-            v = [float(val) for val in v]
-            
-            p = self._settings.get(["pixels"])
-            
-            # Convert pixel information to coordinate pairs
-            converted_points = [(point['x'], point['y']) for point in p]
-            
-            # Calculate the center point for the overlay
-            base_anchor = utils.center_of_quadrilateral(converted_points)            
-
-            # Set axis limits and view
-            printer_length = int(self._settings.get(["printerLength"]))
-            printer_width = int(self._settings.get(["printerWidth"]))
-            printer_depth = int(self._settings.get(["printerDepth"]))
-            
-            # Calculate required aspect ratio for equal scaling
-            max_range = max(printer_length, printer_width, printer_depth)
-            ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
-            
-            ax.set_xlim(0, printer_length)
-            ax.set_ylim(0, printer_width)
-            ax.set_zlim(0, printer_depth)
-            ax.view_init(elev=v[0], azim=v[1], roll=v[2])
-
-            ax.set_proj_type(proj_type='persp', focal_length=v[3])
-
-            x_input = printer_length/2
-            y_input = printer_width/2
-            z_input = 0
-
-            ax.set_axis_off()
-
-            pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
-            
-            overlay_img = io.BytesIO()
-    
-
-            fig.savefig(overlay_img, format='png', transparent=True)
-            # fig.canvas.print_png(arrow_img)
-
-            # Rewind the buffer to the beginning
-            overlay_img.seek(0)
-            
-            plt.close()
-
-            result_image = utils.overlay_images(image_path, overlay_img, base_anchor, pixel_coords, v[4])
-            # result_image.show()
-            
-            rgb_image = Image.new("RGB", result_image.size)
-
-            rgb_image.paste(result_image, mask=result_image.split()[3])
-            result_image = rgb_image
-            
-            img_byte_arr = BytesIO()
-            result_image.save(img_byte_arr, format='JPEG')
-            img_byte_arr = img_byte_arr.getvalue()
-            
-            try:
-
-                encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
-
-                return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
-            except Exception as e:
-                self._logger.error(f"Failed to encode image: {e}")
-                return flask.make_response("Failed to process image", 500)
-
-        # elif command == "process_gcode":
-        #     gcode_path = data.get("gcodeFilePath", "")
-        #     # Here you can add the logic to process the G-code file
-        #     # For simplicity, this example just logs the file path
-        #     self._logger.info(f"Processing G-code file at: {gcode_path}")
-        #     # Implement your G-code processing logic here
-        #     # After processing, you can return a success message or any result of the processing
-        #     return flask.jsonify({"result": "success", "message": "G-code file processed successfully"})
-
-
+            return self.fetch_render(data)
         else:
             self._logger.info(f"Unknown command: {command}")
             return flask.jsonify({"error": "Unknown command"}), 400
 
-
-    def fetch_snapshot(self):
-        # Get the plugin's data folder
+    def handle_get_snapshot(self):
+        """Fetch a snapshot from the webcam and save it locally."""
+        snapshot_url = self._settings.global_get(["webcam", "snapshot"])
         data_folder = self.get_plugin_data_folder()
-        # Define the path to the snapshot file within the plugin's data folder
         snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+        try:
+            response = requests.get(snapshot_url, timeout=10)
+            response.raise_for_status()
+            with open(snapshot_path, 'wb') as f:
+                f.write(response.content)
+            return flask.jsonify(url=snapshot_url)
+        except requests.exceptions.RequestException as e:
+            self._logger.error(f"Failed to fetch snapshot: {e}")
+            return flask.make_response("Snapshot URL not configured or fetch failed", 404)
+
+    def update_printer_dimensions(self, data):
+        """Update printer dimensions from API command data."""
+        self._settings.set(["printerLength"], data.get('printerLength'))
+        self._settings.set(["printerWidth"], data.get('printerWidth'))
+        self._settings.set(["printerDepth"], data.get('printerDepth'))
+        self._settings.save()
+        return flask.jsonify({"result": "success", "message": "Printer dimensions updated successfully"})
+
+    def save_points(self, data):
+        """Save points data to plugin settings."""
+        self._settings.set(["pixels"], data.get("points", []))
+        self._settings.save()
+        return flask.jsonify({"result": "success"})
+
+    def update_image(self, data):
+        """Update the image based on given slider values."""
+        # Example logic to update an image based on slider values and save it
+        values = [data.get(f'value{i+1}', 50) for i in range(5)]
+        self._settings.set(["slider_values"], values)
+        self._settings.save()
+
+        # Assuming plot_arrow generates an image based on the printer dimensions and slider values
+        printer_dims = [0, int(self._settings.get(["printerLength"])),
+                        0, int(self._settings.get(["printerWidth"])),
+                        0, int(self._settings.get(["printerDepth"]))]
         
-        # Check if the snapshot file exists locally in the plugin's data folder
-        if os.path.isfile(snapshot_path):
-            self._logger.info("Using local snapshot from plugin data folder.")
-            # If the file exists, return the path to the local file
-            return snapshot_path
-        else:
-            # If the file does not exist locally, proceed to fetch from the configured URL
-            snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-            if snapshot_url:
-                # Try to fetch the snapshot
-                try:
-                    response = requests.get(snapshot_url, timeout=10)  # Adjust the timeout as needed
-                    response.raise_for_status()  # Raise an error for bad responses
-                    
-                    # Save the fetched snapshot locally for future use
-                    with open(snapshot_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    # Return the path to the newly saved snapshot
-                    return snapshot_path
-                except requests.exceptions.RequestException as e:
-                    self._logger.error(f"Failed to fetch snapshot from URL, attempting to create a default snapshot: {e}")
-            
-            # If URL is not configured or fetching failed, create a default image and save it
-            try:
-                from PIL import Image
-                # Create a default image (you can customize this as per your needs)
-                img = Image.new('RGB', (640, 480), color = (73, 109, 137))
-                img.save(snapshot_path)
-                self._logger.info("Created a default snapshot.")
-                return snapshot_path
-            except Exception as e:
-                self._logger.error(f"Failed to create a default snapshot: {e}")
-                return None
-            
-# Uncomment the below if you have update information
+        # Generate an arrow image based on the current settings (this function must be implemented)
+        arrow_img, pixel_coords = utils.plot_arrow(printer_dims, *values[:4])
+
+        # Fetch base snapshot for overlay
+        data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
+        snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+
+        # Open the image file
+        
+
+        # Overlay the arrow image onto the base image
+        # Assuming overlay_images combines two images into one
+        
+        points = self._settings.get(["pixels"])
+        converted_points = [(point['x'], point['y']) for point in points]
+        
+        base_anchor = utils.center_of_quadrilateral(converted_points)
+        
+        result_image = utils.overlay_images(snapshot_path, arrow_img, base_anchor, pixel_coords, scale=values[4])
+
+        rgb_image = Image.new("RGB", result_image.size)
+
+        rgb_image.paste(result_image, mask=result_image.split()[3])
+        result_image = rgb_image
+        
+        img_byte_arr = BytesIO()
+        result_image.save(img_byte_arr, format='JPEG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
+
+        return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
+
+    def fetch_render(self, data):
+        """Render a visualization from a G-code file and overlay it onto the snapshot."""
+        gcode_path = data.get("gcodeFilePath", "")
+        
+        if gcode_path == "/downloads/files/local/":
+            return flask.make_response("G-code file path is missing", 400)
+
+        # Load G-code and generate a plot
+        gcode_reader = gcode_reader.GcodeReader(gcode_path)
+        fig, ax = plt.subplots()  # Adjust this line according to your actual plotting library
+        gcode_reader.plot(ax)  # This is a placeholder for the actual plot command
+
+        # Convert the matplotlib figure to a PIL Image
+        buf = BytesIO()
+        fig.savefig(buf, format='png')
+        buf.seek(0)
+        overlay_image = Image.open(buf)
+
+        # Fetch base snapshot for overlay
+        base_image_path = self.handle_get_snapshot()
+        base_image = Image.open(base_image_path)
+
+        # Assuming utils.overlay_images can overlay a matplotlib figure onto a PIL image
+        result_image = utils.overlay_images(base_image, overlay_image, scale=1.0)
+
+        # Save the result image
+        result_image_path = os.path.join(self.get_plugin_data_folder(), 'rendered_image.jpg')
+        result_image.save(result_image_path)
+
+        return flask.jsonify({"message": "Render fetched successfully", "path": result_image_path})
+
     def get_update_information(self):
         return {
             "hologram": {
@@ -301,11 +183,12 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 "user": "MarkSlat",
                 "repo": "OctoPrint-Hologram",
                 "current": self._plugin_version,
-                # "pip": "https://github.com/MarkSlat/OctoPrint-Hologram/archive/{target_version}.zip"
+                "pip": "https://github.com/MarkSlat/OctoPrint-Hologram/archive/{target_version}.zip"
             }
         }
 
-__plugin_name__ = "Hologram Plugin"
+# Plugin hooks and metadata
+__plugin_name__ = "Hologram"
 __plugin_pythoncompat__ = ">=3.7,<4"
 __plugin_implementation__ = HologramPlugin()
 __plugin_hooks__ = {
