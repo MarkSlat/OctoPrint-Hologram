@@ -6,6 +6,14 @@ Example Usage
 -------------
 ![demo](octoprint_hologram/static/assets/Demo.png)
 
+Raspberry Pi
+------------
+Since this plugin depends on Numpy you many have to run the following
+- sudo apt-get install libopenblas-base
+- sudo ldconfig
+
+See: https://numpy.org/devdocs/user/troubleshooting-importerror.html
+
 Future plans
 ------------
 To automatically detect failures and defects in real-time by cross comparing the rendered model with the actual print, layer by layer.
