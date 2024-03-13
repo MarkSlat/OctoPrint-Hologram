@@ -733,7 +733,7 @@ class GcodeReader:
         ax.set_ylim(add_margin_to_axis_limits(ymin, ymax))
         return fig, ax
     
-    def plot_layers(self, min_layer, max_layer, ax=None):
+    def plot_layers(self, min_layer, max_layer, color='blue', ax=None):
         """ plot the layers in [min_layer, max_layer) in 3D """
         if (min_layer >= max_layer or min_layer < 1 or max_layer >
                 self.n_layers + 1):
@@ -744,7 +744,10 @@ class GcodeReader:
         left, right = (self.subpath_index_bars[min_layer - 1],
                        self.subpath_index_bars[max_layer - 1])
         for xs, ys, zs in self.subpaths[left: right]:
-            ax.plot(xs, ys, zs)
+            if SINGLE_COLOR:
+                ax.plot(xs, ys, zs, color=color)
+            else:
+                ax.plot(xs, ys, zs)
         return fig, ax
 
     def plot_layer(self, layer=1, ax=None):
