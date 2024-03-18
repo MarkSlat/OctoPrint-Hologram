@@ -14,7 +14,8 @@ plugin_requires = ["Pillow",
                    "matplotlib",
                    "numpy",
                    "pandas",
-                   "seaborn"]
+                   "seaborn",
+                   "scikit-image"]
 
 # Additional package data to install for this plugin. The subfolders "templates", "static" and "translations" will
 # already be installed automatically if they exist.

@@ -2,8 +2,10 @@ import io
 import math
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
-import numpy as np
 from PIL import Image
+from skimage.metrics import structural_similarity as ssim
+from skimage.io import imread
+from skimage.color import rgb2gray
 
 def get_pixel_coords(ax, x, y, z):
     # Transform 3D point to 2D screen coordinates
@@ -125,3 +127,25 @@ def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1
         result_image = result_image.convert("RGB")
     
     return result_image
+
+def calculate_ssim(image_path1, image_path2):
+    # Load the images
+    image1 = imread(image_path1)
+    image2 = imread(image_path2)
+
+    # Convert the images to grayscale
+    image1_gray = rgb2gray(image1)
+    image2_gray = rgb2gray(image2)
+
+    # Ensure data_range is specified for floating point image data
+    data_range = max(image1_gray.max(), image2_gray.max()) - min(image1_gray.min(), image2_gray.min())
+
+    # Compute SSIM between the two images
+    ssim_index, _ = ssim(image1_gray, image2_gray, data_range=data_range, full=True)
+
+    # Return the SSIM index
+    return ssim_index
+
+def normalize_data(value, min_value, max_value):
+    normalized_value = (value - min_value) / (max_value - min_value)
+    return normalized_value
