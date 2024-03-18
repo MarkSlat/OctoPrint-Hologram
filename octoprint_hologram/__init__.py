@@ -23,7 +23,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Define default settings for the plugin."""
         return {
             "pixels": [],
-            "slider_values": [50] * 5,  # Default slider values
+            "slider_values": [1, 1, 1, 1, 1],  # Default slider values
             "printerLength": 0,
             "printerWidth": 0,
             "printerDepth": 0,
@@ -32,6 +32,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
     def on_after_startup(self):
         """Log startup message."""
         self._logger.info("Hologram plugin started!")
+        self._storage_interface = self._file_manager._storage("local")
 
     def get_template_configs(self):
         """Define plugin template configurations."""
@@ -148,15 +149,22 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Render a visualization from a G-code file and overlay it onto the snapshot."""
         gcode_path = data.get("gcodeFilePath", "")
         
-        if gcode_path == "/downloads/files/local/":
-            return flask.make_response("G-code file path is missing", 400)
+        if not gcode_path.endswith('.gcode'):
+            return flask.make_response("Failed to locate file", 500)
+        
+        if not self._storage_interface.file_exists(gcode_path):
+            return flask.make_response("Failed to locate file", 400)
+        
+        gcode_path = self._storage_interface.path_on_disk(gcode_path)
+        
+        flask.current_app.logger.info(f"path: {gcode_path}")       
         
         # Fetch base snapshot for overlay
         data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
         snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
 
         # Load G-code and generate a plot
-        gcode_reader = gcode_reader.GcodeReader(gcode_path)
+        gcode_R = gcode_reader.GcodeReader(gcode_path)
         
         # Define getter function
         def get_layer(self):
@@ -165,7 +173,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         # Inject the getter function
         gcode_reader.GcodeReader.get_layer = get_layer
             
-        fig, ax = gcode_reader.plot_layers(min_layer=1, max_layer=gcode_reader.get_layer())
+        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=gcode_R.get_layer())
         
         v = self._settings.get(["slider_values"])
         v = [float(val) for val in v]

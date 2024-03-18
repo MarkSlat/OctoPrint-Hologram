@@ -4,6 +4,8 @@ $(function() {
 
         var curJobName="";
 
+        var viewInitialized = false;
+
         self.printerLength = ko.observable();
         self.printerWidth = ko.observable();
         self.printerDepth = ko.observable();
@@ -115,6 +117,15 @@ $(function() {
             });
         };
 
+        self.onTabChange = function (current, previous) {
+
+            if (current == "#tab_plugin_hologram") {
+                if (!viewInitialized) {
+                    viewInitialized = true;
+                }
+            }
+        }
+
         self.fromHistoryData = function(data) {
             if(!viewInitialized)
                 return;
@@ -129,7 +140,9 @@ $(function() {
 
         // Method to send G-code file information to the backend
         self.fetchRender = function() {
-            const filePath = `/downloads/files/local/${curJobName}`; // Adjust if the path is different
+            // const baseUrl = window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+            // const filePath = `${baseUrl}/downloads/files/local/${curJobName}`; // Adjust if the path is different
+
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
                 type: "POST",
@@ -137,7 +150,7 @@ $(function() {
                 contentType: "application/json; charset=UTF-8",
                 data: JSON.stringify({
                     command: "fetchRender",
-                    gcodeFilePath: filePath
+                    gcodeFilePath: curJobName
                 }),
                 success: function(response) {
                     self.displayImageUrl(response.image_data);
