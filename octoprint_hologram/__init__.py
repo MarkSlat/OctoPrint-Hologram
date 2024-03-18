@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 from io import BytesIO
 from matplotlib import pyplot as plt
@@ -149,30 +150,89 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         if gcode_path == "/downloads/files/local/":
             return flask.make_response("G-code file path is missing", 400)
+        
+        # Fetch base snapshot for overlay
+        data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
+        snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
 
         # Load G-code and generate a plot
         gcode_reader = gcode_reader.GcodeReader(gcode_path)
-        fig, ax = plt.subplots()  # Adjust this line according to your actual plotting library
-        gcode_reader.plot(ax)  # This is a placeholder for the actual plot command
+        
+        # Define getter function
+        def get_layer(self):
+            return self.n_layers + 1
 
-        # Convert the matplotlib figure to a PIL Image
-        buf = BytesIO()
-        fig.savefig(buf, format='png')
-        buf.seek(0)
-        overlay_image = Image.open(buf)
+        # Inject the getter function
+        gcode_reader.GcodeReader.get_layer = get_layer
+            
+        fig, ax = gcode_reader.plot_layers(min_layer=1, max_layer=gcode_reader.get_layer())
+        
+        v = self._settings.get(["slider_values"])
+        v = [float(val) for val in v]
+        
+        p = self._settings.get(["pixels"])
+        
+        # Convert pixel information to coordinate pairs
+        converted_points = [(point['x'], point['y']) for point in p]
+        
+        # Calculate the center point for the overlay
+        base_anchor = utils.center_of_quadrilateral(converted_points)            
 
-        # Fetch base snapshot for overlay
-        base_image_path = self.handle_get_snapshot()
-        base_image = Image.open(base_image_path)
+        # Set axis limits and view
+        printer_length = int(self._settings.get(["printerLength"]))
+        printer_width = int(self._settings.get(["printerWidth"]))
+        printer_depth = int(self._settings.get(["printerDepth"]))
+        
+        # Calculate required aspect ratio for equal scaling
+        max_range = max(printer_length, printer_width, printer_depth)
+        ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
+        
+        ax.set_xlim(0, printer_length)
+        ax.set_ylim(0, printer_width)
+        ax.set_zlim(0, printer_depth)
+        ax.view_init(elev=v[0], azim=v[1], roll=v[2])
 
-        # Assuming utils.overlay_images can overlay a matplotlib figure onto a PIL image
-        result_image = utils.overlay_images(base_image, overlay_image, scale=1.0)
+        ax.set_proj_type(proj_type='persp', focal_length=v[3])
 
-        # Save the result image
-        result_image_path = os.path.join(self.get_plugin_data_folder(), 'rendered_image.jpg')
-        result_image.save(result_image_path)
+        x_input = printer_length/2
+        y_input = printer_width/2
+        z_input = 0
 
-        return flask.jsonify({"message": "Render fetched successfully", "path": result_image_path})
+        ax.set_axis_off()
+
+        pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
+            
+        overlay_img = io.BytesIO()
+    
+
+        fig.savefig(overlay_img, format='png', transparent=True)
+        # fig.canvas.print_png(arrow_img)
+
+        # Rewind the buffer to the beginning
+        overlay_img.seek(0)
+        
+        plt.close()
+
+        result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
+        # result_image.show()
+        
+        rgb_image = Image.new("RGB", result_image.size)
+
+        rgb_image.paste(result_image, mask=result_image.split()[3])
+        result_image = rgb_image
+        
+        img_byte_arr = BytesIO()
+        result_image.save(img_byte_arr, format='JPEG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        try:
+
+            encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
+
+            return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
+        except Exception as e:
+            self._logger.error(f"Failed to encode image: {e}")
+            return flask.make_response("Failed to process image", 500)
 
     def get_update_information(self):
         return {
