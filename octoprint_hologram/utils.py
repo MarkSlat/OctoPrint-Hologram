@@ -3,6 +3,7 @@ import math
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
 from PIL import Image
+import numpy as np
 from skimage.metrics import structural_similarity as ssim
 from skimage.io import imread
 from skimage.color import rgb2gray
@@ -149,3 +150,25 @@ def calculate_ssim(image_path1, image_path2):
 def normalize_data(value, min_value, max_value):
     normalized_value = (value - min_value) / (max_value - min_value)
     return normalized_value
+
+def find_non_transparent_roi(image_path):
+    # Load the image
+    image = Image.open(image_path)
+    image_np = np.array(image)
+
+    # Initialize the ROI coordinates
+    roi_coords = None
+
+    # Check if the image has an alpha channel
+    if image_np.shape[2] == 4:
+        # Separate the alpha channel
+        alpha_channel = image_np[:, :, 3]
+        # Find where the image is not transparent
+        non_transparent = np.where(alpha_channel != 0)
+        min_y, min_x = np.min(non_transparent, axis=1)
+        max_y, max_x = np.max(non_transparent, axis=1)
+
+        # The coordinates of the Region of Interest
+        roi_coords = (min_x, min_y, max_x, max_y)
+
+    return roi_coords

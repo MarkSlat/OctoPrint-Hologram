@@ -14,7 +14,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.SettingsPlugin,
                      octoprint.plugin.TemplatePlugin,
                      octoprint.plugin.AssetPlugin,
-                     octoprint.plugin.SimpleApiPlugin):
+                     octoprint.plugin.SimpleApiPlugin,
+                     octoprint.plugin.ProgressPlugin,
+                     octoprint.plugin.WebcamProviderPlugin):
     """
     An OctoPrint plugin to enhance 3D printing with holographic projections.
     """
@@ -33,6 +35,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Log startup message."""
         self._logger.info("Hologram plugin started!")
         self._storage_interface = self._file_manager._storage("local")
+        self.query_position = False
+        self.current_position = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E": 0.0}
+        self.max_height = 0
+        self.max_layer = 0
+        # self.current_layer = 0
 
     def get_template_configs(self):
         """Define plugin template configurations."""
@@ -54,6 +61,12 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             'fetchRender': ['gcodeFilePath'],
             'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']
         }
+        
+    def on_print_progress(self, storage, path, progress):
+        # self._logger.info("New progress {}".format(progress))
+        if progress % 5 == 0:
+            self.query_position = True
+        
 
     def on_api_command(self, command, data):
         """Route API commands to their respective handlers."""
@@ -73,6 +86,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
     def handle_get_snapshot(self):
         """Fetch a snapshot from the webcam and save it locally."""
+        self._logger.info("Hologram plugin started!".format(self.get_webcam_configurations()))
         snapshot_url = self._settings.global_get(["webcam", "snapshot"])
         data_folder = self.get_plugin_data_folder()
         snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
@@ -170,10 +184,19 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         def get_layer(self):
             return self.n_layers + 1
 
+        def get_limits(self):
+            return self.xyzlimits
+        
         # Inject the getter function
         gcode_reader.GcodeReader.get_layer = get_layer
+        
+        gcode_reader.GcodeReader.get_limits = get_limits
+        
+        _, _, _, _, _, self.max_height = gcode_R.get_limits()
+        
+        self.max_layer = gcode_R.get_layer()
             
-        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=gcode_R.get_layer())
+        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=self.max_layer)
         
         v = self._settings.get(["slider_values"])
         v = [float(val) for val in v]
@@ -220,6 +243,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         overlay_img.seek(0)
         
         plt.close()
+        
+        self.roi_coords = utils.find_non_transparent_roi(overlay_img)
+        
+        overlay_img.seek(0)
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
         # result_image.show()
@@ -234,13 +261,36 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         img_byte_arr = img_byte_arr.getvalue()
         
         try:
-
             encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
 
             return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
         except Exception as e:
             self._logger.error(f"Failed to encode image: {e}")
             return flask.make_response("Failed to process image", 500)
+
+    def hook_gcode_queuing(self, comm_instance, phase, cmd, cmd_type, gcode, subcode=None, tags=None, *args, **kwargs):        
+        if self.query_position == True:
+            self.query_position = False
+            return [("M114",), (cmd, cmd_type, tags)]
+        
+    def hook_gcode_received(self, comm_instance, line, *args, **kwargs):
+        # Check if the line contains position information, excluding lines that only include "Count X:..."
+        if "X:" not in line or "Count X:" not in line:
+            return line
+
+        # Split the line at " Count" to ignore the stepper motor count values
+        line = line.split(" Count")[0]
+
+        # Parse the position from the part of the line before "Count"
+        try:
+            parts = line.split(' ')
+            # This creates a dictionary for each coordinate by splitting at ':' and converting the second part to float
+            self.current_position = {part.split(':')[0]: float(part.split(':')[1]) for part in parts if ':' in part}
+            self._logger.info("Current position updated: {}".format(self.current_position))
+        except Exception as e:
+            self._logger.error("Error parsing position: {}".format(e))
+
+        return line
 
     def get_update_information(self):
         return {
@@ -260,5 +310,7 @@ __plugin_name__ = "Hologram"
 __plugin_pythoncompat__ = ">=3.7,<4"
 __plugin_implementation__ = HologramPlugin()
 __plugin_hooks__ = {
-    "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+    "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+    "octoprint.comm.protocol.gcode.received": __plugin_implementation__.hook_gcode_received,
+    "octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing
 }
