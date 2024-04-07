@@ -42,8 +42,6 @@ $(function() {
             });
         };
         
-
-
         self.getSnapshot = function() {
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
@@ -54,7 +52,7 @@ $(function() {
                     command: "get_snapshot"
                 }),
                 success: function(response) {
-                    self.snapshotUrl(response.url);
+                    self.snapshotUrl(response.image_data);
                     self.points([]); // Clear previous points
                 },
                 error: function() {

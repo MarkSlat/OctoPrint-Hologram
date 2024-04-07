@@ -15,11 +15,15 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.TemplatePlugin,
                      octoprint.plugin.AssetPlugin,
                      octoprint.plugin.SimpleApiPlugin,
-                     octoprint.plugin.ProgressPlugin,
-                     octoprint.plugin.WebcamProviderPlugin):
+                     octoprint.plugin.ProgressPlugin):
     """
     An OctoPrint plugin to enhance 3D printing with holographic projections.
     """
+    def __init__(self):
+        self.query_position = False
+        self.current_position = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E": 0.0}
+        self.max_height = 0
+        self.max_layer = 0
 
     def get_settings_defaults(self):
         """Define default settings for the plugin."""
@@ -35,10 +39,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Log startup message."""
         self._logger.info("Hologram plugin started!")
         self._storage_interface = self._file_manager._storage("local")
-        self.query_position = False
-        self.current_position = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E": 0.0}
-        self.max_height = 0
-        self.max_layer = 0
         # self.current_layer = 0
 
     def get_template_configs(self):
@@ -85,20 +85,16 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             return flask.jsonify({"error": "Unknown command"}), 400
 
     def handle_get_snapshot(self):
-        """Fetch a snapshot from the webcam and save it locally."""
-        self._logger.info("Hologram plugin started!".format(self.get_webcam_configurations()))
-        snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-        data_folder = self.get_plugin_data_folder()
-        snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
         try:
-            response = requests.get(snapshot_url, timeout=10)
-            response.raise_for_status()
-            with open(snapshot_path, 'wb') as f:
-                f.write(response.content)
-            return flask.jsonify(url=snapshot_url)
-        except requests.exceptions.RequestException as e:
-            self._logger.error(f"Failed to fetch snapshot: {e}")
-            return flask.make_response("Snapshot URL not configured or fetch failed", 404)
+            image_data = self.take_snapshot(save=True)
+            if image_data is None:
+                raise Exception("No image data returned.")
+
+            encoded_string = base64.b64encode(image_data).decode('utf-8')
+            return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
+        except Exception as e:
+            self._logger.error(f"Failed to encode image: {e}")
+            return flask.make_response("Failed to process image", 500)
 
     def update_printer_dimensions(self, data):
         """Update printer dimensions from API command data."""
@@ -144,7 +140,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         base_anchor = utils.center_of_quadrilateral(converted_points)
         
-        result_image = utils.overlay_images(snapshot_path, arrow_img, base_anchor, pixel_coords, scale=values[4])
+        snapshot_img = Image.open(snapshot_path).convert("RGBA")
+        
+        result_image = utils.overlay_images(snapshot_img, arrow_img, base_anchor, pixel_coords, scale=values[4])
 
         rgb_image = Image.new("RGB", result_image.size)
 
@@ -174,8 +172,16 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         flask.current_app.logger.info(f"path: {gcode_path}")       
         
         # Fetch base snapshot for overlay
-        data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
-        snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+        # data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
+        # snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+        
+        image_data = self.take_snapshot(save=False)
+
+        # Convert the bytes data to a file-like object
+        image_data_io = BytesIO(image_data)
+
+        # Now, you can use this file-like object with PIL as if it was a file
+        snapshot_path = Image.open(image_data_io).convert("RGBA")
 
         # Load G-code and generate a plot
         gcode_R = gcode_reader.GcodeReader(gcode_path)
@@ -262,12 +268,29 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         try:
             encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
-
             return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
         except Exception as e:
             self._logger.error(f"Failed to encode image: {e}")
             return flask.make_response("Failed to process image", 500)
 
+    def take_snapshot(self, save=False):
+        snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+        try:
+            response = requests.get(snapshot_url, timeout=10)
+            response.raise_for_status()
+
+            if save:
+                data_folder = self.get_plugin_data_folder()
+                snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
+                with open(snapshot_path, 'wb') as f:
+                    f.write(response.content)
+                return response.content
+            else:
+                return response.content
+        except requests.exceptions.RequestException as e:
+            self._logger.error(f"Failed to fetch snapshot: {e}")
+            raise Exception(f"Failed to fetch snapshot due to request exception: {e}")
+        
     def hook_gcode_queuing(self, comm_instance, phase, cmd, cmd_type, gcode, subcode=None, tags=None, *args, **kwargs):        
         if self.query_position == True:
             self.query_position = False

@@ -105,7 +105,8 @@ def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1
     scale = math.sqrt(scale ** 2 / 2)
     
     # Load the base image in RGBA mode for transparency handling
-    base_image = Image.open(base_path).convert("RGBA")
+    # base_image = Image.open(base_path).convert("RGBA")
+    # base_image = base_path
     
     # Load the overlay image and scale it, ensuring it is in RGBA mode
     overlay_image_original = Image.open(overlay_path).convert("RGBA")
@@ -119,13 +120,13 @@ def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1
     paste_y = base_anchor[1] - overlay_anchor_scaled[1]
 
     # Create a new image for the result to ensure transparency is handled correctly
-    result_image = Image.new('RGBA', base_image.size)
-    result_image.paste(base_image, (0, 0))  # Paste the base image first
+    result_image = Image.new('RGBA', base_path.size)
+    result_image.paste(base_path, (0, 0))  # Paste the base image first
     result_image.paste(overlay_image_scaled, (int(paste_x), int(paste_y)), overlay_image_scaled)  # Paste the scaled overlay
     
     # If the original base image was not in RGBA, convert the result back to its original mode
-    if base_image.mode != "RGBA":
-        result_image = result_image.convert("RGB")
+    # if base_image.mode != "RGBA":
+    #     result_image = result_image.convert("RGB")
     
     return result_image
 
