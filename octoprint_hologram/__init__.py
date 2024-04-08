@@ -347,6 +347,18 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         overlay_img.seek(0)
         
+        # image_pil = Image.open(overlay_img)
+
+        # Ensure debug folder exists
+        # debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
+        # if not os.path.exists(debug_folder):
+        #     os.makedirs(debug_folder)
+
+        # # Save the PIL Image to the file
+        # image_pil.save(os.path.join(debug_folder, f"overlay_layer_{layer}.png"), "PNG")
+        
+        overlay_img.seek(0)
+        
         return overlay_img, pixel_coords
     
     def simm_compare(self):
@@ -378,17 +390,28 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         overlay_img, pixel_coords = self.create_render(layer=layer)
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
+        
+        # Translate the top-left corner of the ROI
+        translated_min_x, translated_min_y = utils.translate_overlay_point(
+            self.roi_coords[0], self.roi_coords[1], base_anchor, pixel_coords, v[4])
+
+        # Translate the bottom-right corner of the ROI
+        translated_max_x, translated_max_y = utils.translate_overlay_point(
+            self.roi_coords[2], self.roi_coords[3], base_anchor, pixel_coords, v[4])
+
+        # Create a new tuple for self.roi_coords with the updated coordinates
+        translated_roi_coords = (translated_min_x, translated_min_y, translated_max_x, translated_max_y)
 
         # Crop the images according to self.roi_coords before SSIM calculation
-        cropped_result_image = result_image.crop(self.roi_coords)
-        cropped_snapshot_path = snapshot_path.crop(self.roi_coords)
+        cropped_result_image = result_image.crop(translated_roi_coords)
+        cropped_snapshot_path = snapshot_path.crop(translated_roi_coords)
         
         # Save the images for debugging
-        debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
-        if not os.path.exists(debug_folder):
-            os.makedirs(debug_folder)
-        cropped_snapshot_path.save(os.path.join(debug_folder, f"snapshot_layer_{layer}.png"), "PNG")
-        cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
+        # debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
+        # if not os.path.exists(debug_folder):
+        #     os.makedirs(debug_folder)
+        # cropped_snapshot_path.save(os.path.join(debug_folder, f"snapshot_layer_{layer}.png"), "PNG")
+        # cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
 
         # Calculate SSIM on the cropped images
         temp = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)

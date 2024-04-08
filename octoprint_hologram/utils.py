@@ -106,10 +106,6 @@ def center_of_quadrilateral(points):
 def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1.0):
     scale = math.sqrt(scale ** 2 / 2)
     
-    # Load the base image in RGBA mode for transparency handling
-    # base_image = Image.open(base_path).convert("RGBA")
-    # base_image = base_path
-    
     # Load the overlay image and scale it, ensuring it is in RGBA mode
     overlay_image_original = Image.open(overlay_path).convert("RGBA")
     overlay_width_scaled, overlay_height_scaled = [int(scale * s) for s in overlay_image_original.size]
@@ -125,12 +121,43 @@ def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1
     result_image = Image.new('RGBA', base_path.size)
     result_image.paste(base_path, (0, 0))  # Paste the base image first
     result_image.paste(overlay_image_scaled, (int(paste_x), int(paste_y)), overlay_image_scaled)  # Paste the scaled overlay
-    
-    # If the original base image was not in RGBA, convert the result back to its original mode
-    # if base_image.mode != "RGBA":
-    #     result_image = result_image.convert("RGB")
-    
+        
     return result_image
+
+def translate_overlay_point(x_overlay, y_overlay, base_anchor, overlay_anchor, scale):
+    """
+    Translates a point from the overlay image to the final image, considering scaling and anchor point alignment.
+
+    Args:
+    - x_overlay, y_overlay: Coordinates of the point on the overlay image.
+    - base_anchor: The anchor point on the base image (tuple of x, y).
+    - overlay_anchor: The anchor point on the overlay image before scaling (tuple of x, y).
+    - scale: The scaling factor applied to the overlay image.
+
+    Returns:
+    - Tuple of (x_final, y_final): The translated coordinates of the point on the final image.
+    """
+
+    # Adjust the scale to consider diagonal scaling
+    scale_adjusted = math.sqrt(scale ** 2 / 2)
+
+    # Calculate the scaled anchor position
+    overlay_anchor_scaled_x = overlay_anchor[0] * scale_adjusted
+    overlay_anchor_scaled_y = overlay_anchor[1] * scale_adjusted
+
+    # Calculate the displacement needed to align the overlay's scaled anchor with the base anchor
+    displacement_x = base_anchor[0] - overlay_anchor_scaled_x
+    displacement_y = base_anchor[1] - overlay_anchor_scaled_y
+
+    # Scale the point coordinates
+    x_overlay_scaled = x_overlay * scale_adjusted
+    y_overlay_scaled = y_overlay * scale_adjusted
+
+    # Translate the scaled point based on the overlay's displacement
+    x_final = displacement_x + x_overlay_scaled
+    y_final = displacement_y + y_overlay_scaled
+
+    return (int(x_final), int(y_final))
 
 def calculate_ssim(image1, image2):
     # Convert PIL Images to numpy arrays
