@@ -1,5 +1,7 @@
 import io
 import math
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
 from PIL import Image
@@ -130,20 +132,26 @@ def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1
     
     return result_image
 
-def calculate_ssim(image_path1, image_path2):
-    # Load the images
-    image1 = imread(image_path1)
-    image2 = imread(image_path2)
+def calculate_ssim(image1, image2):
+    # Convert PIL Images to numpy arrays
+    image1_np = np.array(image1)
+    image2_np = np.array(image2)
+    
+    # If the images have an alpha channel, discard it (assuming RGBA format)
+    if image1_np.shape[-1] == 4:
+        image1_np = image1_np[..., :3]
+    if image2_np.shape[-1] == 4:
+        image2_np = image2_np[..., :3]
 
     # Convert the images to grayscale
-    image1_gray = rgb2gray(image1)
-    image2_gray = rgb2gray(image2)
+    image1_gray = rgb2gray(image1_np)
+    image2_gray = rgb2gray(image2_np)
 
     # Ensure data_range is specified for floating point image data
     data_range = max(image1_gray.max(), image2_gray.max()) - min(image1_gray.min(), image2_gray.min())
 
     # Compute SSIM between the two images
-    ssim_index, _ = ssim(image1_gray, image2_gray, data_range=data_range, full=True)
+    ssim_index = ssim(image1_gray, image2_gray, data_range=data_range)
 
     # Return the SSIM index
     return ssim_index
@@ -155,21 +163,32 @@ def normalize_data(value, min_value, max_value):
 def find_non_transparent_roi(image_path):
     # Load the image
     image = Image.open(image_path)
+    
+    # Ensure the image is in RGBA format for processing
+    if image.mode != 'RGBA':
+        raise ValueError("Image does not contain an alpha channel")
+
     image_np = np.array(image)
 
-    # Initialize the ROI coordinates
-    roi_coords = None
+    # Separate the alpha channel
+    alpha_channel = image_np[:, :, 3]
 
-    # Check if the image has an alpha channel
-    if image_np.shape[2] == 4:
-        # Separate the alpha channel
-        alpha_channel = image_np[:, :, 3]
-        # Find where the image is not transparent
-        non_transparent = np.where(alpha_channel != 0)
-        min_y, min_x = np.min(non_transparent, axis=1)
-        max_y, max_x = np.max(non_transparent, axis=1)
+    # Find where the image is not transparent
+    non_transparent = np.where(alpha_channel != 0)
+    min_y, min_x = np.min(non_transparent, axis=1)
+    max_y, max_x = np.max(non_transparent, axis=1)
 
-        # The coordinates of the Region of Interest
-        roi_coords = (min_x, min_y, max_x, max_y)
+    # Calculate the additional 5% for width and height
+    additional_width = int((max_x - min_x) * 0.05)
+    additional_height = int((max_y - min_y) * 0.05)
+
+    # Adjust the ROI coordinates to add 5%, ensuring it does not exceed image bounds
+    min_x = max(0, min_x - additional_width)
+    min_y = max(0, min_y - additional_height)
+    max_x = min(image_np.shape[1] - 1, max_x + additional_width)
+    max_y = min(image_np.shape[0] - 1, max_y + additional_height)
+
+    # The coordinates of the Region of Interest, adjusted
+    roi_coords = (min_x, min_y, max_x, max_y)
 
     return roi_coords

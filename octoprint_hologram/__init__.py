@@ -1,8 +1,13 @@
 import base64
 import io
+import math
 import os
+import matplotlib
+import numpy as np
+matplotlib.use('Agg')
 from io import BytesIO
 from matplotlib import pyplot as plt
+from octoprint.events import Events
 import requests
 from PIL import Image
 import flask
@@ -15,7 +20,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.TemplatePlugin,
                      octoprint.plugin.AssetPlugin,
                      octoprint.plugin.SimpleApiPlugin,
-                     octoprint.plugin.ProgressPlugin):
+                     octoprint.plugin.ProgressPlugin,
+                     octoprint.plugin.EventHandlerPlugin):
     """
     An OctoPrint plugin to enhance 3D printing with holographic projections.
     """
@@ -24,6 +30,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self.current_position = {"X": 0.0, "Y": 0.0, "Z": 0.0, "E": 0.0}
         self.max_height = 0
         self.max_layer = 0
+        self.gcode_path = ""
 
     def get_settings_defaults(self):
         """Define default settings for the plugin."""
@@ -39,7 +46,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Log startup message."""
         self._logger.info("Hologram plugin started!")
         self._storage_interface = self._file_manager._storage("local")
-        # self.current_layer = 0
 
     def get_template_configs(self):
         """Define plugin template configurations."""
@@ -62,10 +68,30 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']
         }
         
+    def on_event(self, event, payload):
+        # if event == Events.PRINT_STARTED:
+        #     self._logger.info("Print started creating render")
+            
+        #     overlay_img, pixel_coords = self.create_render(layer=-1)
+            
+        #     pixel_coords = pixel_coords * 2
+            
+        if event == Events.FILE_SELECTED:
+            self._logger.info("File Selected: {}".format(payload["path"]))
+
+
+        
     def on_print_progress(self, storage, path, progress):
-        # self._logger.info("New progress {}".format(progress))
+        if self._storage_interface.file_exists(path):
+            self.gcode_path = self._storage_interface.path_on_disk(path)
+
         if progress % 5 == 0:
             self.query_position = True
+            
+            if progress == 0:
+                print()
+            else:    
+                self.simm_compare()
         
 
     def on_api_command(self, command, data):
@@ -128,12 +154,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         # Fetch base snapshot for overlay
         data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
         snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
-
-        # Open the image file
-        
-
-        # Overlay the arrow image onto the base image
-        # Assuming overlay_images combines two images into one
         
         points = self._settings.get(["pixels"])
         converted_points = [(point['x'], point['y']) for point in points]
@@ -169,12 +189,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         gcode_path = self._storage_interface.path_on_disk(gcode_path)
         
-        flask.current_app.logger.info(f"path: {gcode_path}")       
+        self.gcode_path = gcode_path
         
-        # Fetch base snapshot for overlay
-        # data_folder = self.get_plugin_data_folder()  # Replace with the actual method to get the data folder
-        # snapshot_path = os.path.join(data_folder, 'snapshot.jpg')
-        
+        # Fetch base snapshot for overlay        
         image_data = self.take_snapshot(save=False)
 
         # Convert the bytes data to a file-like object
@@ -184,78 +201,20 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         snapshot_path = Image.open(image_data_io).convert("RGBA")
 
         # Load G-code and generate a plot
-        gcode_R = gcode_reader.GcodeReader(gcode_path)
-        
-        # Define getter function
-        def get_layer(self):
-            return self.n_layers + 1
-
-        def get_limits(self):
-            return self.xyzlimits
-        
-        # Inject the getter function
-        gcode_reader.GcodeReader.get_layer = get_layer
-        
-        gcode_reader.GcodeReader.get_limits = get_limits
-        
-        _, _, _, _, _, self.max_height = gcode_R.get_limits()
-        
-        self.max_layer = gcode_R.get_layer()
-            
-        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=self.max_layer)
-        
-        v = self._settings.get(["slider_values"])
-        v = [float(val) for val in v]
-        
         p = self._settings.get(["pixels"])
         
         # Convert pixel information to coordinate pairs
         converted_points = [(point['x'], point['y']) for point in p]
         
+        v = self._settings.get(["slider_values"])
+        v = [float(val) for val in v]
+        
         # Calculate the center point for the overlay
-        base_anchor = utils.center_of_quadrilateral(converted_points)            
-
-        # Set axis limits and view
-        printer_length = int(self._settings.get(["printerLength"]))
-        printer_width = int(self._settings.get(["printerWidth"]))
-        printer_depth = int(self._settings.get(["printerDepth"]))
+        base_anchor = utils.center_of_quadrilateral(converted_points)
         
-        # Calculate required aspect ratio for equal scaling
-        max_range = max(printer_length, printer_width, printer_depth)
-        ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
-        
-        ax.set_xlim(0, printer_length)
-        ax.set_ylim(0, printer_width)
-        ax.set_zlim(0, printer_depth)
-        ax.view_init(elev=v[0], azim=v[1], roll=v[2])
-
-        ax.set_proj_type(proj_type='persp', focal_length=v[3])
-
-        x_input = printer_length/2
-        y_input = printer_width/2
-        z_input = 0
-
-        ax.set_axis_off()
-
-        pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
-            
-        overlay_img = io.BytesIO()
-    
-
-        fig.savefig(overlay_img, format='png', transparent=True)
-        # fig.canvas.print_png(arrow_img)
-
-        # Rewind the buffer to the beginning
-        overlay_img.seek(0)
-        
-        plt.close()
-        
-        self.roi_coords = utils.find_non_transparent_roi(overlay_img)
-        
-        overlay_img.seek(0)
+        overlay_img, pixel_coords = self.create_render(layer=-1)
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
-        # result_image.show()
         
         rgb_image = Image.new("RGB", result_image.size)
 
@@ -314,6 +273,128 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             self._logger.error("Error parsing position: {}".format(e))
 
         return line
+    
+    def create_render(self, layer=-1):
+        self._logger.info("Creating render")
+        
+        self._logger.info("Gcode path {}".format(self.gcode_path))
+        
+        self._logger.info("Passed in layer {}".format(layer))
+        
+        gcode_R = gcode_reader.GcodeReader(self.gcode_path)
+        
+        # Define getter function
+        def get_layer(self):
+            return self.n_layers + 1
+
+        def get_limits(self):
+            return self.xyzlimits
+        
+        # Inject the getter function
+        gcode_reader.GcodeReader.get_layer = get_layer
+        
+        gcode_reader.GcodeReader.get_limits = get_limits
+        
+        _, _, _, _, _, self.max_height = gcode_R.get_limits()
+        
+        self.max_layer = gcode_R.get_layer()
+        
+        self._logger.info("Max layers {}".format(self.max_layer))
+        
+        if layer == -1 or layer > self.max_layer:
+            layer = self.max_layer
+        
+        self._logger.info("Using layer {}".format(layer))
+        
+        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=layer)
+        
+        v = self._settings.get(["slider_values"])
+        v = [float(val) for val in v]
+
+        # Set axis limits and view
+        printer_length = int(self._settings.get(["printerLength"]))
+        printer_width = int(self._settings.get(["printerWidth"]))
+        printer_depth = int(self._settings.get(["printerDepth"]))
+        
+        # Calculate required aspect ratio for equal scaling
+        max_range = max(printer_length, printer_width, printer_depth)
+        ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
+        
+        ax.set_xlim(0, printer_length)
+        ax.set_ylim(0, printer_width)
+        ax.set_zlim(0, printer_depth)
+        ax.view_init(elev=v[0], azim=v[1], roll=v[2])
+
+        ax.set_proj_type(proj_type='persp', focal_length=v[3])
+
+        x_input = printer_length/2
+        y_input = printer_width/2
+        z_input = 0
+
+        ax.set_axis_off()
+
+        pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
+        
+        overlay_img = io.BytesIO()
+
+        fig.savefig(overlay_img, format='png', transparent=True)
+
+        plt.close()
+
+        overlay_img.seek(0)
+        
+        self.roi_coords = utils.find_non_transparent_roi(overlay_img)
+        
+        overlay_img.seek(0)
+        
+        return overlay_img, pixel_coords
+    
+    def simm_compare(self):
+        layer = math.ceil(((self.current_position["Z"]) / (self.max_height)) * self.max_layer)
+
+        self._logger.info("Layer: {}".format(layer))
+        
+        # Fetch base snapshot for overlay        
+        image_data = self.take_snapshot(save=False)
+
+        # Convert the bytes data to a file-like object
+        image_data_io = BytesIO(image_data)
+
+        # Now, you can use this file-like object with PIL as if it was a file
+        snapshot_path = Image.open(image_data_io).convert("RGBA")
+
+        # Load G-code and generate a plot
+        p = self._settings.get(["pixels"])
+        
+        # Convert pixel information to coordinate pairs
+        converted_points = [(point['x'], point['y']) for point in p]
+        
+        v = self._settings.get(["slider_values"])
+        v = [float(val) for val in v]
+        
+        # Calculate the center point for the overlay
+        base_anchor = utils.center_of_quadrilateral(converted_points)
+        
+        overlay_img, pixel_coords = self.create_render(layer=layer)
+
+        result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
+
+        # Crop the images according to self.roi_coords before SSIM calculation
+        cropped_result_image = result_image.crop(self.roi_coords)
+        cropped_snapshot_path = snapshot_path.crop(self.roi_coords)
+        
+        # Save the images for debugging
+        debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
+        if not os.path.exists(debug_folder):
+            os.makedirs(debug_folder)
+        cropped_snapshot_path.save(os.path.join(debug_folder, f"snapshot_layer_{layer}.png"), "PNG")
+        cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
+
+        # Calculate SSIM on the cropped images
+        temp = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)
+        
+        self._logger.info("SSIM: {}".format(temp))
+
 
     def get_update_information(self):
         return {
