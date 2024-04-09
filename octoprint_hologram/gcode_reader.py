@@ -50,7 +50,7 @@ PLOT_SUPPORT = True
 
 # set true to use one color for plot
 # set false to use random color for plot
-SINGLE_COLOR = False
+SINGLE_COLOR = True
 
 # set true to plot scans with positive power in different color
 # this is for powder bed fusion
@@ -733,7 +733,7 @@ class GcodeReader:
         ax.set_ylim(add_margin_to_axis_limits(ymin, ymax))
         return fig, ax
     
-    def plot_layers(self, min_layer, max_layer, color='blue', ax=None):
+    def plot_layers(self, min_layer, max_layer, color='white', ax=None):
         """ plot the layers in [min_layer, max_layer) in 3D """
         if (min_layer >= max_layer or min_layer < 1 or max_layer >
                 self.n_layers + 1):
