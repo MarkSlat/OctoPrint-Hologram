@@ -143,7 +143,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
     def update_image(self, data):
         """Update the image based on given slider values."""
         # Example logic to update an image based on slider values and save it
-        values = [data.get(f'value{i+1}', 50) for i in range(5)]
+        values = [float(data.get(f'value{i+1}', 50)) for i in range(5)]
         self._settings.set(["slider_values"], values)
         self._settings.save()
 
