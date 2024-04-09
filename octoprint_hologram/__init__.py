@@ -453,10 +453,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         # Save the images for debugging
         # debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
-        # if not os.path.exists(debug_folder):
-        #     os.makedirs(debug_folder)
-        # cropped_snapshot_path.save(os.path.join(debug_folder, f"snapshot_layer_{layer}.png"), "PNG")
-        # cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
+        debug_folder = self.get_plugin_data_folder()
+        if not os.path.exists(debug_folder):
+            os.makedirs(debug_folder)
+        cropped_snapshot_path.save(os.path.join(debug_folder, f"snapshot_layer_{layer}.png"), "PNG")
+        cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
 
         # Calculate SSIM on the cropped images
         temp = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)
