@@ -29,7 +29,7 @@
     <div class="adjustment-sliders">
         <h4>Image Adjustments</h4>
         <div class="slider-container">
-            Elev: <input type="number" step="0.01" min="0" max="100" data-bind="value: sliderValues()[0], event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}">
+            Elev: <input type="number" step="0.01" min="-30" max="100" data-bind="value: sliderValues()[0], event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}">
         </div>
         <div class="slider-container">
             Azim: <input type="number" step="0.01" min="0" max="359.99" data-bind="value: sliderValues()[1], event:{'input': function(data, event) {sliderValues()[1](parseFloat(event.target.value)); updateImage();}}">
