@@ -9,9 +9,10 @@ from io import BytesIO
 from matplotlib import pyplot as plt
 from octoprint.events import Events
 import requests
-from PIL import Image
+from PIL import Image, ImageDraw
 import flask
 import octoprint.plugin
+from scipy.spatial import ConvexHull
 
 from octoprint_hologram import utils, gcode_reader
 
@@ -31,6 +32,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self.max_height = 0
         self.max_layer = 0
         self.gcode_path = ""
+        self.baseline_ssim = 0
+        self.extruder_points = []
 
     def get_settings_defaults(self):
         """Define default settings for the plugin."""
@@ -40,6 +43,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             "printerLength": 0,
             "printerWidth": 0,
             "printerDepth": 0,
+            "extruder_X": [-30, 40],
+            "extruder_Y": [-20, 30],
+            "extruder_Z": [0, 70]
         }
 
     def on_after_startup(self):
@@ -72,10 +78,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         # if event == Events.PRINT_STARTED:
         #     self._logger.info("Print started creating render")
             
-        #     overlay_img, pixel_coords = self.create_render(layer=-1)
-            
-        #     pixel_coords = pixel_coords * 2
-            
         if event == Events.FILE_SELECTED:
             self._logger.info("File Selected: {}".format(payload["path"]))
 
@@ -89,9 +91,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             self.query_position = True
             
             if progress == 0:
-                print()
+                self.baseline_ssim = self.simm_compare(layer=-1)
             else:    
-                self.simm_compare()
+                layer = math.ceil(((self.current_position["Z"]) / (self.max_height)) * self.max_layer)
+                value = utils.normalize_data(self.simm_compare(layer=layer), self.baseline_ssim, 1)
+                self._logger.info("SSIM score:{}".format(value))
         
 
     def on_api_command(self, command, data):
@@ -335,6 +339,29 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
         pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
         
+        self._logger.info("Translating points")
+        
+        extruder_X = self._settings.get(["extruder_X"])
+        extruder_Y = self._settings.get(["extruder_Y"])
+        extruder_Z = self._settings.get(["extruder_Z"])
+
+        # Generate all 8 points of the cuboid
+        points = [
+            (self.current_position["X"] + dx, self.current_position["Y"] + dy, self.current_position["Z"] + dz)
+            for dx in extruder_X
+            for dy in extruder_Y
+            for dz in extruder_Z
+        ]
+        
+        self.extruder_points = [utils.get_pixel_coords(ax, *point) for point in points]
+        
+        self._logger.info("Translating done")
+        
+        points = np.array(self.extruder_points)
+        hull = ConvexHull(points)
+        
+        self._logger.info("Found Convex Hull")
+        
         overlay_img = io.BytesIO()
 
         fig.savefig(overlay_img, format='png', transparent=True)
@@ -346,6 +373,26 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self.roi_coords = utils.find_non_transparent_roi(overlay_img)
         
         overlay_img.seek(0)
+        
+        # Load the image
+        overlay_img.seek(0)  # Ensure we're at the start of the BytesIO object
+        image_pil = Image.open(overlay_img).convert("RGBA")  # Ensure image is in RGBA mode for transparency
+
+        # Create a mask image of the same size, filled with the 'transparent' color
+        mask_img = Image.new('L', image_pil.size, 0)  # 'L' mode for a single channel image
+        draw = ImageDraw.Draw(mask_img)
+
+        # Draw the polygon on the mask image based on the hull vertices
+        draw.polygon([tuple(points[vertex]) for vertex in hull.vertices], fill=255)
+
+        # Apply the mask to the image
+        transparent_area = Image.new('RGBA', image_pil.size, (0,0,0,0))  # An image filled with transparency
+        image_pil.paste(transparent_area, mask=mask_img)
+
+        # If needed, save the modified image back to a BytesIO object for further processing
+        overlay_img_modified = io.BytesIO()
+        image_pil.save(overlay_img_modified, format='PNG')
+        overlay_img_modified.seek(0)  # Rewind to the start of the BytesIO object
         
         # image_pil = Image.open(overlay_img)
 
@@ -359,15 +406,15 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         overlay_img.seek(0)
         
-        return overlay_img, pixel_coords
+        return overlay_img_modified, pixel_coords
     
-    def simm_compare(self):
-        layer = math.ceil(((self.current_position["Z"]) / (self.max_height)) * self.max_layer)
-
+    def simm_compare(self, layer):
         self._logger.info("Layer: {}".format(layer))
         
         # Fetch base snapshot for overlay        
         image_data = self.take_snapshot(save=False)
+        
+        overlay_img, pixel_coords = self.create_render(layer=layer)
 
         # Convert the bytes data to a file-like object
         image_data_io = BytesIO(image_data)
@@ -386,8 +433,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         # Calculate the center point for the overlay
         base_anchor = utils.center_of_quadrilateral(converted_points)
-        
-        overlay_img, pixel_coords = self.create_render(layer=layer)
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
         
@@ -417,6 +462,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         temp = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)
         
         self._logger.info("SSIM: {}".format(temp))
+        
+        return temp
 
 
     def get_update_information(self):
