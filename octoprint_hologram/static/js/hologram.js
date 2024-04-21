@@ -1,6 +1,8 @@
 $(function() {
-    function HologramViewModel() {
+    function HologramViewModel(parameters) {
         var self = this;
+
+        self.printerStateViewModel = parameters[4];
 
         // Observables related to printer dimensions and images
         self.printerLength = ko.observable();
@@ -39,6 +41,33 @@ $(function() {
 
         // Enhanced mode toggle
         self.enhancedMode = ko.observable(false);
+
+        // Observable for the color hex code
+        self.colorHex = ko.observable("#ffffff"); // Default color
+
+        // New observable for the SSIM chart image URL
+        self.ssimChartUrl = ko.observable();
+
+        // New observable for the SSIM chart image URL
+        self.ssimChartUrl = ko.observable();
+
+        // Periodic update function for the SSIM chart
+        self.updateSsimChart = function(forceUpdate) {
+            // Update if printing is true or if force update is specified
+            if (self.printerStateViewModel.isPrinting() || forceUpdate) {
+                var timestamp = new Date().getTime(); // Cache busting
+                var newUrl = `/plugin/hologram/ssim_chart?time=${timestamp}`;
+                self.ssimChartUrl(newUrl);
+            }
+        };
+
+        // Initialize the periodic update for the SSIM chart
+        setInterval(function() {
+            self.updateSsimChart(false); // Regular updates without forcing
+        }, 60000); // Update every 60 seconds
+
+        // Initial update on load
+        self.updateSsimChart(true); // Force update on load
 
         // Send printer dimensions to the server
         self.sendPrinterDimensions = function() {
@@ -207,6 +236,7 @@ $(function() {
                 },
                 error: function(xhr, status, error) {
                     console.error("Failed to send G-code file to the backend:", status, error);
+                    alert("Failed to get render plase make sure you have slected a job");
                 }
             });
         };
@@ -270,11 +300,31 @@ $(function() {
                 }),
                 success: function(response) {
                     console.log("Enhanced mode state sent successfully to server.");
-                    alert("Enhanced mode state updated!");
                 },
                 error: function() {
                     console.error("Failed to send enhanced mode state.");
-                    alert("Failed to update enhanced mode state!");
+                }
+            });
+        };
+
+        // Function to update color on the server
+        self.updateColor = function() {
+            $.ajax({
+                url: API_BASEURL + "plugin/hologram",
+                type: "POST",
+                dataType: "json",
+                contentType: "application/json; charset=UTF-8",
+                data: JSON.stringify({
+                    command: "set_color",
+                    colorHex: self.colorHex()
+                }),
+                success: function(response) {
+                    console.log("Color updated successfully:", response);
+                    alert("Color updated successfully!");
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to update color:", error);
+                    alert("Failed to update color!");
                 }
             });
         };
@@ -284,7 +334,7 @@ $(function() {
     // Register the ViewModel with OctoPrint's ViewModel system
     OCTOPRINT_VIEWMODELS.push({
         construct: HologramViewModel,
-        dependencies: ["settingsViewModel", "loginStateViewModel", "printerProfilesViewModel", "controlViewModel"],
+        dependencies: ["settingsViewModel", "loginStateViewModel", "printerProfilesViewModel", "controlViewModel", "printerStateViewModel"],
         elements: ["#settings_plugin_hologram", "#tab_plugin_hologram"]
     });
 });

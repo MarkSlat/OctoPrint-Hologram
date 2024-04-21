@@ -4,6 +4,14 @@
     </div>
 
     <div>
+        <h4>Set Filament Color</h4>
+        <div>
+            <input type="color" data-bind="value: colorHex">
+        </div>
+        <button data-bind="click: updateColor">Update Color</button>
+    </div>
+
+    <div>
         <h4>Printer Plate Dimensions</h4>
         <span>Note: Not build volume</span>
         <br>
@@ -17,7 +25,7 @@
 
     <div>
         <h4>Printer Head (Extruder) Dimensions</h4>
-        <span>Note: X, Y, Z movement limits</span>
+        <span>Note: X, Y, Z extruder housing relative to the nozel</span>
         <br>
         <div>X Axis (-X to +X):
             <input type="number" step="1" data-bind="value: extruderXMin" placeholder="Min X">

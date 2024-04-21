@@ -1,8 +1,12 @@
 <div id="tab_plugin_hologram">
-    <h3>Hologram Settings</h3>
-    <!-- Other elements for points, image adjustments, and displaying the fetched Base64 image -->
+    <h3>Hologram Tab</h3>
+
     <button data-bind="click: fetchRender">Fetch and Render Image</button>
     <div data-bind="visible: displayImageUrl">
         <img data-bind="attr: { src: displayImageUrl }" />
     </div>
+    <div>
+    <img data-bind="attr: { src: ssimChartUrl }" alt="SSIM Chart"/>
+    </div>
+    
 </div>

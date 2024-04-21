@@ -22,7 +22,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.AssetPlugin,
                      octoprint.plugin.SimpleApiPlugin,
                      octoprint.plugin.ProgressPlugin,
-                     octoprint.plugin.EventHandlerPlugin):
+                     octoprint.plugin.EventHandlerPlugin,
+                     octoprint.plugin.BlueprintPlugin):
     """
     An OctoPrint plugin to enhance 3D printing with holographic projections.
     """
@@ -41,6 +42,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         return {
             "pixels": [],
             "slider_values": [1, 1, 1, 1, 1],  # Default slider values
+            "colorHex": "white",
             "printerLength": 0,
             "printerWidth": 0,
             "printerDepth": 0,
@@ -53,6 +55,25 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         """Log startup message."""
         self._logger.info("Hologram plugin started!")
         self._storage_interface = self._file_manager._storage("local")
+        
+        plt.figure(figsize=(10, 5))
+        # With an empty ssim_scores, plot an empty graph with a disabled message
+        plt.text(0.5, 0.5, 'Disabled function or print not initiated',
+        horizontalalignment='center', verticalalignment='center',
+        fontsize=12, color='red', transform=plt.gca().transAxes)
+        
+        plt.title('SSIM Scores')
+        plt.xlabel('Observation Number')
+        plt.ylabel('SSIM Score')
+        plt.grid(True)
+
+        # Save the figure
+        data_folder = self.get_plugin_data_folder()
+        snapshot_path = os.path.join(data_folder, 'ssimChart.jpg')
+        plt.savefig(snapshot_path, format='jpeg', dpi=300)
+
+        # Close the plot figure to free up memory
+        plt.close()
 
     def get_template_configs(self):
         """Define plugin template configurations."""
@@ -72,6 +93,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             'get_snapshot': [],  # No parameters expected for getting a snapshot
             'save_points': ['points'],  # Expects a list of points
             'fetchRender': ['gcodeFilePath'],  # Expects the path to the G-code file
+            'set_color': ['colorHex'],
             'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth'],  # Printer dimensions
             'update_extruder_dimensions': ['extruderXMin', 'extruderXMax', 'extruderYMin', 'extruderYMax', 'extruderZMin', 'extruderZMax'],
             'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],
@@ -103,8 +125,36 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
                 layer = math.ceil(((self.current_position["Z"]) / (self.max_height)) * self.max_layer)
                 value = utils.normalize_data(self.simm_compare(layer=layer), self.baseline_ssim, 1)
                 self.ssim_scores.append(value)
+                
                 # self._logger.info("SSIM score:{}".format(value))
-        
+                
+                # Assuming self.ssim_scores is filled with data
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(self.ssim_scores, marker='o', linestyle='-', color='g')
+                plt.title('SSIM Scores')
+                plt.xlabel('Observation Number')
+                plt.ylabel('SSIM Score')
+                plt.grid(True)
+
+                # Save the figure
+                data_folder = self.get_plugin_data_folder()
+                snapshot_path = os.path.join(data_folder, 'ssimChart.jpg')
+                plt.savefig(snapshot_path, format='jpeg', dpi=300)
+
+                # Close the plot figure to free up memory
+                plt.close()
+    
+    @octoprint.plugin.BlueprintPlugin.route("/ssim_chart", methods=["GET"])
+    def get_ssim_chart(self):
+        """Serve the latest SSIM chart image."""
+        data_folder = self.get_plugin_data_folder()
+        image_path = 'ssimChart.jpg'
+        full_path = os.path.join(data_folder, image_path)
+        if not os.path.isfile(full_path):
+            self._logger.info("Requested SSIM chart not found.")
+            flask.abort(404, description="File not found.")
+        return flask.send_from_directory(data_folder, image_path, as_attachment=False)
 
     def on_api_command(self, command, data):
         """Route API commands to their respective handlers."""
@@ -123,6 +173,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             return self.update_image(data)
         elif command == "save_off_set":
             return self.save_off_set(data)
+        elif command == "set_color":
+            return self.set_color(data)
         elif command == "fetchRender":
             return self.fetch_render(data)
         else:
@@ -167,12 +219,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self._settings.save()
         
         points = self._settings.get(["pixels"])
-        
-        # height = 480
 
         converted_points = [(point['x'], point['y']) for point in points]
-        
-        self._logger.info(f"Converted points {converted_points}")
         
         printer_dims = (float(self._settings.get(["printerLength"])),
                         float(self._settings.get(["printerWidth"])),
@@ -181,16 +229,12 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         elevation, azimuth, roll, focal_length, scale = utils.optimize_projection(converted_points, printer_dims)
         
-        self._logger.info(f"Values: {elevation} {azimuth} {roll} {focal_length} {scale}")
+        # self._logger.info(f"Values: {elevation} {azimuth} {roll} {focal_length} {scale}")
         
         values = [float(elevation), float(azimuth), float(roll), float(focal_length), float(scale)]
         
         self._settings.set(["slider_values"], values)
         self._settings.save()
-        
-        # base_anchor = utils.center_of_quadrilateral(converted_points)
-        
-        # self._logger.info(f"base anchor: {base_anchor}")
         
         return flask.jsonify({"result": "success"})
 
@@ -251,7 +295,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         # Update the slider values in settings
         self._settings.set(["slider_values"], values)
         self._settings.save()
-
+        
+    def set_color(self, data):
+        self._settings.set(["colorHex"], data.get("colorHex", []))
+        self._settings.save()
+    
     def fetch_render(self, data):
         """Render a visualization from a G-code file and overlay it onto the snapshot."""
         gcode_path = data.get("gcodeFilePath", "")
@@ -286,14 +334,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         v = self._settings.get(["slider_values"])
         v = [float(val) for val in v]
         
-        self._logger.info(f"Values: {v}")
-        
         # Calculate the center point for the overlay
         base_anchor = utils.center_of_quadrilateral(converted_points)
         
         overlay_img, pixel_coords = self.create_render(layer=-1)
-        
-        self._logger.info(f"Anchors: {base_anchor} {pixel_coords}")
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
         
@@ -349,19 +393,13 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             parts = line.split(' ')
             # This creates a dictionary for each coordinate by splitting at ':' and converting the second part to float
             self.current_position = {part.split(':')[0]: float(part.split(':')[1]) for part in parts if ':' in part}
-            self._logger.info("Current position updated: {}".format(self.current_position))
+            # self._logger.info("Current position updated: {}".format(self.current_position))
         except Exception as e:
             self._logger.error("Error parsing position: {}".format(e))
 
         return line
     
-    def create_render(self, layer=-1):
-        self._logger.info("Creating render")
-        
-        self._logger.info("Gcode path {}".format(self.gcode_path))
-        
-        self._logger.info("Passed in layer {}".format(layer))
-        
+    def create_render(self, layer=-1):        
         gcode_R = gcode_reader.GcodeReader(self.gcode_path)
         
         # Define getter function
@@ -387,7 +425,9 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         self._logger.info("Using layer {}".format(layer))
         
-        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=layer)
+        color = self._settings.get(["colorHex"])
+        
+        fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=layer, color=color)
         
         v = self._settings.get(["slider_values"])
         v = [float(val) for val in v]
