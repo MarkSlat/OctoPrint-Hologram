@@ -33,6 +33,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self.max_layer = 0
         self.gcode_path = ""
         self.baseline_ssim = 0
+        self.ssim_scores = []
         self.extruder_points = []
 
     def get_settings_defaults(self):
@@ -62,17 +63,22 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
     def get_assets(self):
         """Define web assets used by the plugin."""
-        return {"js": ["js/hologram.js"]}
+        return {"js": ["js/hologram.js"],
+                "css": ["css/hologram.css"]}
 
     def get_api_commands(self):
         """Define API commands the plugin responds to."""
         return {
-            'get_snapshot': [],
-            'save_points': ['points'],
+            'get_snapshot': [],  # No parameters expected for getting a snapshot
+            'save_points': ['points'],  # Expects a list of points
+            'fetchRender': ['gcodeFilePath'],  # Expects the path to the G-code file
+            'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth'],  # Printer dimensions
+            'update_extruder_dimensions': ['extruderXMin', 'extruderXMax', 'extruderYMin', 'extruderYMax', 'extruderZMin', 'extruderZMax'],
             'update_image': ['value1', 'value2', 'value3', 'value4', 'value5'],
-            'fetchRender': ['gcodeFilePath'],
-            'update_printer_dimensions': ['printerLength', 'printerWidth', 'printerDepth']
+            'save_off_set': ['value1', 'value2', 'value3', 'value4', 'value5'],
+            'set_enhanced_mode': ['enabled']  # Enhanced mode state toggle
         }
+
         
     def on_event(self, event, payload):
         # if event == Events.PRINT_STARTED:
@@ -80,8 +86,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             
         if event == Events.FILE_SELECTED:
             self._logger.info("File Selected: {}".format(payload["path"]))
-
-
+            self.gcode_path = payload["path"]
+            
         
     def on_print_progress(self, storage, path, progress):
         if self._storage_interface.file_exists(path):
@@ -92,22 +98,31 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
             
             if progress == 0:
                 self.baseline_ssim = self.simm_compare(layer=-1)
+                self.ssim_scores = []
             else:    
                 layer = math.ceil(((self.current_position["Z"]) / (self.max_height)) * self.max_layer)
                 value = utils.normalize_data(self.simm_compare(layer=layer), self.baseline_ssim, 1)
-                self._logger.info("SSIM score:{}".format(value))
+                self.ssim_scores.append(value)
+                # self._logger.info("SSIM score:{}".format(value))
         
 
     def on_api_command(self, command, data):
         """Route API commands to their respective handlers."""
+        
+        self._logger.info(f"Command: {command} Data: {data}")
+        
         if command == "get_snapshot":
             return self.handle_get_snapshot()
         elif command == "update_printer_dimensions":
             return self.update_printer_dimensions(data)
+        elif command == "update_extruder_dimensions":
+            return self.update_extruder_dimensions(data)
         elif command == "save_points":
             return self.save_points(data)
         elif command == "update_image":
             return self.update_image(data)
+        elif command == "save_off_set":
+            return self.save_off_set(data)
         elif command == "fetchRender":
             return self.fetch_render(data)
         else:
@@ -133,19 +148,62 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         self._settings.set(["printerDepth"], data.get('printerDepth'))
         self._settings.save()
         return flask.jsonify({"result": "success", "message": "Printer dimensions updated successfully"})
+    
+    def update_extruder_dimensions(self, data):
+        """Update extruder dimensions from API command data."""
+        # Update X-axis range
+        self._settings.set(["extruder_X"], [data.get('extruderXMin'), data.get('extruderXMax')])
+        # Update Y-axis range
+        self._settings.set(["extruder_Y"], [data.get('extruderYMin'), data.get('extruderYMax')])
+        # Update Z-axis range
+        self._settings.set(["extruder_Z"], [data.get('extruderZMin'), data.get('extruderZMax')])
+        
+        self._settings.save()
+        return flask.jsonify({"result": "success", "message": "Extruder dimensions updated successfully"})
 
     def save_points(self, data):
         """Save points data to plugin settings."""
         self._settings.set(["pixels"], data.get("points", []))
         self._settings.save()
+        
+        points = self._settings.get(["pixels"])
+        
+        # height = 480
+
+        converted_points = [(point['x'], point['y']) for point in points]
+        
+        self._logger.info(f"Converted points {converted_points}")
+        
+        printer_dims = (float(self._settings.get(["printerLength"])),
+                        float(self._settings.get(["printerWidth"])),
+                        float(self._settings.get(["printerDepth"])))
+        
+        
+        elevation, azimuth, roll, focal_length, scale = utils.optimize_projection(converted_points, printer_dims)
+        
+        self._logger.info(f"Values: {elevation} {azimuth} {roll} {focal_length} {scale}")
+        
+        values = [float(elevation), float(azimuth), float(roll), float(focal_length), float(scale)]
+        
+        self._settings.set(["slider_values"], values)
+        self._settings.save()
+        
+        # base_anchor = utils.center_of_quadrilateral(converted_points)
+        
+        # self._logger.info(f"base anchor: {base_anchor}")
+        
         return flask.jsonify({"result": "success"})
 
     def update_image(self, data):
         """Update the image based on given slider values."""
-        # Example logic to update an image based on slider values and save it
-        values = [float(data.get(f'value{i+1}', 50)) for i in range(5)]
-        self._settings.set(["slider_values"], values)
-        self._settings.save()
+        
+        limits = [(-360, 360), (-360, 360), (-179, 179), (0.075, 1), (0.1, 5)]
+
+        # Retrieve current slider values
+        current_values = self._settings.get(["slider_values"])
+
+        # Calculate new slider values by adding offsets from the data and clipping them within individual limits
+        values = [max(limits[i][0], min(limits[i][1], current_values[i] + float(data.get(f'value{i+1}', 0)))) for i in range(5)]
 
         # Assuming plot_arrow generates an image based on the printer dimensions and slider values
         printer_dims = [0, int(self._settings.get(["printerLength"])),
@@ -180,10 +238,25 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         encoded_string = base64.b64encode(img_byte_arr).decode('utf-8')
 
         return flask.jsonify(image_data=f"data:image/jpeg;base64,{encoded_string}")
+    
+    def save_off_set(self, data):        
+        limits = [(-360, 360), (-360, 360), (-179, 179), (0.075, 1), (0.1, 5)]
+
+        # Retrieve current slider values
+        current_values = self._settings.get(["slider_values"])
+
+        # Calculate new slider values by adding offsets from the data and clipping them within individual limits
+        values = [max(limits[i][0], min(limits[i][1], current_values[i] + float(data.get(f'value{i+1}', 0)))) for i in range(5)]
+        
+        # Update the slider values in settings
+        self._settings.set(["slider_values"], values)
+        self._settings.save()
 
     def fetch_render(self, data):
         """Render a visualization from a G-code file and overlay it onto the snapshot."""
         gcode_path = data.get("gcodeFilePath", "")
+        
+        gcode_path = self.gcode_path
         
         if not gcode_path.endswith('.gcode'):
             return flask.make_response("Failed to locate file", 500)
@@ -213,10 +286,14 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         v = self._settings.get(["slider_values"])
         v = [float(val) for val in v]
         
+        self._logger.info(f"Values: {v}")
+        
         # Calculate the center point for the overlay
         base_anchor = utils.center_of_quadrilateral(converted_points)
         
         overlay_img, pixel_coords = self.create_render(layer=-1)
+        
+        self._logger.info(f"Anchors: {base_anchor} {pixel_coords}")
 
         result_image = utils.overlay_images(snapshot_path, overlay_img, base_anchor, pixel_coords, v[4])
         

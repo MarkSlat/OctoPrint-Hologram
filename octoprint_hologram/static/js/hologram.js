@@ -1,26 +1,46 @@
 $(function() {
-    function HologramViewModel(parameters) {
+    function HologramViewModel() {
         var self = this;
 
-        var curJobName="";
-
-        var viewInitialized = false;
-
+        // Observables related to printer dimensions and images
         self.printerLength = ko.observable();
         self.printerWidth = ko.observable();
         self.printerDepth = ko.observable();
         self.snapshotUrl = ko.observable();
-        self.updatedImageUrl = ko.observable();
         self.displayImageUrl = ko.observable();
-        self.points = ko.observableArray([]);
-        self.sliderValues = ko.observableArray([
-            ko.observable(90.0), 
-            ko.observable(0.0), 
-            ko.observable(0.0), 
-            ko.observable(1.0), 
-            ko.observable(1.0)
+        self.updatedImageUrl = ko.observable();
+
+        // Extruder dimensions
+        self.extruderXMin = ko.observable(-20); // Default value for -X
+        self.extruderXMax = ko.observable(20);  // Default value for +X
+        self.extruderYMin = ko.observable(-20); // Default value for -Y
+        self.extruderYMax = ko.observable(20);  // Default value for +Y
+        self.extruderZMin = ko.observable(0);   // Default value for -Z
+        self.extruderZMax = ko.observable(40);  // Default value for +Z
+
+        // Observable array to manage points on the canvas
+        self.points = ko.observableArray([
+            { x: ko.observable(50), y: ko.observable(50) },
+            { x: ko.observable(550), y: ko.observable(50) },
+            { x: ko.observable(550), y: ko.observable(350) },
+            { x: ko.observable(50), y: ko.observable(350) }
         ]);
 
+        // To handle the selected point for moving
+        self.selectedPoint = null;
+
+        self.sliderValues = ko.observableArray([
+            ko.observable(0.0), 
+            ko.observable(0.0), 
+            ko.observable(0.0), 
+            ko.observable(0.0), 
+            ko.observable(0.0)
+        ]);
+
+        // Enhanced mode toggle
+        self.enhancedMode = ko.observable(false);
+
+        // Send printer dimensions to the server
         self.sendPrinterDimensions = function() {
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
@@ -41,7 +61,33 @@ $(function() {
                 }
             });
         };
-        
+
+        // Function to send extruder dimensions
+    self.sendExtruderDimensions = function() {
+        $.ajax({
+            url: API_BASEURL + "plugin/hologram",
+            type: "POST",
+            dataType: "json",
+            contentType: "application/json; charset=UTF-8",
+            data: JSON.stringify({
+                command: "update_extruder_dimensions",
+                extruderXMin: self.extruderXMin(),
+                extruderXMax: self.extruderXMax(),
+                extruderYMin: self.extruderYMin(),
+                extruderYMax: self.extruderYMax(),
+                extruderZMin: self.extruderZMin(),
+                extruderZMax: self.extruderZMax()
+            }),
+            success: function(response) {
+                console.log("Extruder dimensions updated successfully.");
+            },
+            error: function() {
+                console.error("Failed to update extruder dimensions.");
+            }
+        });
+    };
+
+        // Fetch a snapshot from the server
         self.getSnapshot = function() {
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
@@ -52,8 +98,12 @@ $(function() {
                     command: "get_snapshot"
                 }),
                 success: function(response) {
-                    self.snapshotUrl(response.image_data);
-                    self.points([]); // Clear previous points
+                    self.snapshotUrl(response.image_data); // Set the new image URL from the response
+                    $("#hologram-snapshot").one("load", function() {
+                        self.initializeCanvas(); // Initialize the canvas once the image is loaded
+                    }).each(function() {
+                        if (this.complete) $(this).trigger('load');
+                    });
                 },
                 error: function() {
                     alert("Failed to get snapshot");
@@ -61,19 +111,65 @@ $(function() {
             });
         };
 
-        self.recordClick = function(data, event) {
-            var offset = $(event.target).offset();
-            var x = event.pageX - offset.left;
-            var y = event.pageY - offset.top;
+        // Initialize the canvas dimensions based on the loaded image
+        self.initializeCanvas = function() {
+            var img = document.getElementById('hologram-snapshot');
+            var canvas = document.getElementById('overlay-canvas');
+            canvas.width = img.clientWidth;
+            canvas.height = img.clientHeight;
+            self.drawQuadrilateral();
+            $(canvas).css('pointer-events', 'auto'); // Make sure canvas is interactive
+        };
 
-            if (self.points().length < 4) {
-                self.points.push({ x: Math.round(x), y: Math.round(y) });
-            } else {
-                // Maximum of 4 points reached
+        // Draw the quadrilateral based on the defined points
+        self.drawQuadrilateral = function() {
+            var canvas = document.getElementById('overlay-canvas');
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            self.points().forEach(function(point, index) {
+                ctx[index === 0 ? 'moveTo' : 'lineTo'](point.x(), point.y());
+            });
+            ctx.closePath();
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        };
+
+        // Event handlers for mouse actions on the canvas
+        self.mouseDown = function(data, event) {
+            var canvas = document.getElementById('overlay-canvas');
+            var rect = canvas.getBoundingClientRect();
+            var mouseX = event.clientX - rect.left;
+            var mouseY = event.clientY - rect.top;
+            self.points().forEach(function(point) {
+                if (Math.abs(point.x() - mouseX) < 10 && Math.abs(point.y() - mouseY) < 10) {
+                    self.selectedPoint = point;
+                }
+            });
+        };
+
+        self.mouseMove = function(data, event) {
+            if (self.selectedPoint) {
+                var rect = event.target.getBoundingClientRect();
+                var mouseX = event.clientX - rect.left;
+                var mouseY = event.clientY - rect.top;
+                self.selectedPoint.x(mouseX);
+                self.selectedPoint.y(mouseY);
+                self.drawQuadrilateral();
             }
         };
 
+        self.mouseUp = function(data, event) {
+            self.selectedPoint = null;
+        };
+
+        // Save the points back to the server
         self.savePoints = function() {
+            var pointsData = ko.toJS(self.points).map(function(point) {
+                return { x: point.x, y: point.y };
+            });
+
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
                 type: "POST",
@@ -81,13 +177,36 @@ $(function() {
                 contentType: "application/json; charset=UTF-8",
                 data: JSON.stringify({
                     command: "save_points",
-                    points: ko.toJS(self.points)
+                    points: pointsData
                 }),
                 success: function(response) {
-                    // Handle success
+                    console.log("Points saved successfully:", response);
+                    alert("Points saved successfully!");
                 },
-                error: function(response) {
-                    console.error("Failed to save points:", response.responseText);
+                error: function(xhr) {
+                    console.error("Failed to save points:", xhr.responseText);
+                    alert("Failed to save points!");
+                }
+            });
+        };
+
+        // Fetch render based on the current G-code
+        self.fetchRender = function() {
+            $.ajax({
+                url: API_BASEURL + "plugin/hologram",
+                type: "POST",
+                dataType: "json",
+                contentType: "application/json; charset=UTF-8",
+                data: JSON.stringify({
+                    command: "fetchRender",
+                    gcodeFilePath: "JobName"
+                }),
+                success: function(response) {
+                    self.displayImageUrl(response.image_data);
+                    console.log("G-code file successfully processed by the backend.", response);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to send G-code file to the backend:", status, error);
                 }
             });
         };
@@ -115,53 +234,54 @@ $(function() {
             });
         };
 
-        self.onTabChange = function (current, previous) {
-
-            if (current == "#tab_plugin_hologram") {
-                if (!viewInitialized) {
-                    viewInitialized = true;
-                }
-            }
-        }
-
-        self.fromHistoryData = function(data) {
-            if(!viewInitialized)
-                return;
-                curJobName = data.job.file.path;
-        };
-
-        self.fromCurrentData = function(data) {
-            if(!viewInitialized)
-                return;
-            curJobName = data.job.file.path;
-        }
-
-        // Method to send G-code file information to the backend
-        self.fetchRender = function() {
-            // const baseUrl = window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
-            // const filePath = `${baseUrl}/downloads/files/local/${curJobName}`; // Adjust if the path is different
-
+        self.sendOffSets = function() {
             $.ajax({
                 url: API_BASEURL + "plugin/hologram",
                 type: "POST",
                 dataType: "json",
                 contentType: "application/json; charset=UTF-8",
                 data: JSON.stringify({
-                    command: "fetchRender",
-                    gcodeFilePath: curJobName
+                    command: "save_off_set",
+                    value1: self.sliderValues()[0](),
+                    value2: self.sliderValues()[1](),
+                    value3: self.sliderValues()[2](),
+                    value4: self.sliderValues()[3](),
+                    value5: self.sliderValues()[4]()
                 }),
                 success: function(response) {
-                    self.displayImageUrl(response.image_data);
-                    console.log("G-code file successfully processed by the backend.", response);
-                    // Additional actions based on the response
+                    console.log("Printer dimensions updated successfully.");
                 },
-                error: function(xhr, status, error) {
-                    console.error("Failed to send G-code file to the backend:", status, error);
+                error: function() {
+                    console.error("Failed to update printer dimensions.");
                 }
             });
         };
+
+        // Toggle enhanced mode state and send it to the server
+        self.sendEnhancedMode = function() {
+            $.ajax({
+                url: API_BASEURL + "plugin/hologram",
+                type: "POST",
+                dataType: "json",
+                contentType: "application/json; charset=UTF-8",
+                data: JSON.stringify({
+                    command: "set_enhanced_mode",
+                    enabled: self.enhancedMode()
+                }),
+                success: function(response) {
+                    console.log("Enhanced mode state sent successfully to server.");
+                    alert("Enhanced mode state updated!");
+                },
+                error: function() {
+                    console.error("Failed to send enhanced mode state.");
+                    alert("Failed to update enhanced mode state!");
+                }
+            });
+        };
+
     }
 
+    // Register the ViewModel with OctoPrint's ViewModel system
     OCTOPRINT_VIEWMODELS.push({
         construct: HologramViewModel,
         dependencies: ["settingsViewModel", "loginStateViewModel", "printerProfilesViewModel", "controlViewModel"],

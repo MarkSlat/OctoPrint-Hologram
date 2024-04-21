@@ -1,53 +1,95 @@
 <div id="settings_plugin_hologram" class="tab-pane">
-    
-    <h3>Hologram Settings</h3>
+    <div>
+        <h3>Hologram settings</h3>
+    </div>
 
     <div>
-        <h4>Printer Dimensions</h4>
+        <h4>Printer Plate Dimensions</h4>
+        <span>Note: Not build volume</span>
+        <br>
         <div>Length: <input type="number" step="1" data-bind="value: printerLength"></div>
         <div>Width: <input type="number" step="1" data-bind="value: printerWidth"></div>
         <div>Depth: <input type="number" step="1" data-bind="value: printerDepth"></div>
-        <!-- Button to send dimensions -->
-        <button data-bind="click: sendPrinterDimensions">Update Printer Dimensions</button>
+        <button data-bind="click: sendPrinterDimensions">Update Dimensions</button>
     </div>
 
-    <button data-bind="click: getSnapshot">Get Snapshot</button>
+    <br>
+
     <div>
-        <img id="hologram-snapshot" data-bind="attr:{src: snapshotUrl}, visible: snapshotUrl, event:{click: recordClick}" style="cursor: crosshair;" />
+        <h4>Printer Head (Extruder) Dimensions</h4>
+        <span>Note: X, Y, Z movement limits</span>
+        <br>
+        <div>X Axis (-X to +X):
+            <input type="number" step="1" data-bind="value: extruderXMin" placeholder="Min X">
+            <input type="number" step="1" data-bind="value: extruderXMax" placeholder="Max X">
+        </div>
+        <div>Y Axis (-Y to +Y):
+            <input type="number" step="1" data-bind="value: extruderYMin" placeholder="Min Y">
+            <input type="number" step="1" data-bind="value: extruderYMax" placeholder="Max Y">
+        </div>
+        <div>Z Axis (-Z to +Z):
+            <input type="number" step="1" data-bind="value: extruderZMin" placeholder="Min Z">
+            <input type="number" step="1" data-bind="value: extruderZMax" placeholder="Max Z">
+        </div>
+        <button data-bind="click: sendExtruderDimensions">Update Extruder Dimensions</button>
     </div>
+
+    <br>
     <div>
-        Points (click on the image):
-        <ul data-bind="foreach: points">
-            <li>
-                (<span data-bind="text: x"></span>, <span data-bind="text: y"></span>)
-            </li>
-        </ul>
+        <h4>Select Plate</h4>
+        <span>Please drag the box over the plate</span>
+        <br>
+        <button data-bind="click: getSnapshot">Get Snapshot</button>
+        <div id="image-container" style="position: relative;">
+            <img id="hologram-snapshot" data-bind="attr:{src: snapshotUrl}, visible: snapshotUrl() != null">
+            <canvas id="overlay-canvas" data-bind="event: {
+                mousedown: mouseDown, 
+                mousemove: mouseMove,
+                mouseup: mouseUp,
+                mouseout: mouseUp
+            }" style="position: absolute; top: 0; left: 0; width: 100%; pointer-events: auto;"></canvas>
+        </div>
+        <button data-bind="click: savePoints">Lock in Plate Area</button>
     </div>
-    <button data-bind="click: savePoints, enable: points().length == 4">Save Points</button>
-   
-    <!-- Input boxes for image adjustments -->
+
+    <br>
+
+    <h4>Image Adjustments</h4>
     <div class="adjustment-sliders">
-        <h4>Image Adjustments</h4>
+        
         <div class="slider-container">
-            Elev: <input type="number" step="0.01" min="-30" max="100" data-bind="value: sliderValues()[0], event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}">
+            Elev: <input type="number" step="0.01" min="-90" max="90" data-bind="value: sliderValues()[0], event:{'input': function(data, event) {sliderValues()[0](parseFloat(event.target.value)); updateImage();}}">
         </div>
         <div class="slider-container">
-            Azim: <input type="number" step="0.01" min="0" max="359.99" data-bind="value: sliderValues()[1], event:{'input': function(data, event) {sliderValues()[1](parseFloat(event.target.value)); updateImage();}}">
+            Azim: <input type="number" step="0.01" min="-180" max="180" data-bind="value: sliderValues()[1], event:{'input': function(data, event) {sliderValues()[1](parseFloat(event.target.value)); updateImage();}}">
         </div>
         <div class="slider-container">
             Roll: <input type="number" step="0.01" min="-30" max="30" data-bind="value: sliderValues()[2], event:{'input': function(data, event) {sliderValues()[2](parseFloat(event.target.value)); updateImage();}}">
         </div>
         <div class="slider-container">
-            Focal length: <input type="number" step="0.001" min="0.01" max="1" data-bind="value: sliderValues()[3], event:{'input': function(data, event) {sliderValues()[3](parseFloat(event.target.value)); updateImage();}}">
+            Focal length: <input type="number" step="0.001" min="-1" max="1" data-bind="value: sliderValues()[3], event:{'input': function(data, event) {sliderValues()[3](parseFloat(event.target.value)); updateImage();}}">
         </div>
         <div class="slider-container">
-            Scale: <input type="number" step="0.01" min="0" max="5" data-bind="value: sliderValues()[4], event:{'input': function(data, event) {sliderValues()[4](parseFloat(event.target.value)); updateImage();}}">
+            Scale: <input type="number" step="0.01" min="-3" max="3" data-bind="value: sliderValues()[4], event:{'input': function(data, event) {sliderValues()[4](parseFloat(event.target.value)); updateImage();}}">
         </div>
+        
+        <h5>Updated Image</h5>
+        <div id="updated-image-container" style="position: relative;">
+            <img data-bind="attr: { src: updatedImageUrl }" />
+        </div>
+
+        <div>
+            <button data-bind="click: sendOffSets">Save Off Sets</button>
+        </div>
+
     </div>
     
-    <!-- Updated image -->
     <div>
-        <h4>Updated Image</h4>
-        <img data-bind="attr: { src: updatedImageUrl }" />
+        <h4>Enhanced Hologram Mode</h4>
+        <label>
+            <input type="checkbox" data-bind="checked: enhancedMode">
+            Enable Enhanced Mode
+        </label>
+        <button data-bind="click: sendEnhancedMode">Update Mode</button>
     </div>
 </div>

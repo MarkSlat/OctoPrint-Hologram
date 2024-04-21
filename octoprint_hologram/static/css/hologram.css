@@ -1,14 +1,23 @@
-.slider-container {
-    display: inline-block;
-    transform: rotate(270deg);
-    transform-origin: right top;
-    /* Adjust the margin and position as needed to align with your image */
-    margin-right: 20px;
-    margin-top: 20px;
+#image-container {
     position: relative;
+    width: 640px; /* Adjust width as necessary to fit your image */
+    height: 480px; /* Adjust height as necessary */
 }
-
-/* Adjust the width of the slider container to match the height of your sliders */
-.slider-container input[type="range"] {
-    width: 200px; /* This width becomes the "height" of the vertical slider */
+#updated-image-container {
+    position: relative;
+    width: 640px; 
+    height: 480px;
+}
+#hologram-snapshot, #overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%; /* Ensure canvas matches the image size */
+    height: 100%;
+}
+canvas {
+    pointer-events: none; /* Make sure the canvas does not block image events */
+}
+canvas:hover {
+    pointer-events: auto; /* Enable pointer events when hovering over the canvas */
 }
