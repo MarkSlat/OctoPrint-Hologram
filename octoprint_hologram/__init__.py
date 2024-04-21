@@ -472,12 +472,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         self.extruder_points = [utils.get_pixel_coords(ax, *point) for point in points]
         
-        self._logger.info("Translating done")
-        
         points = np.array(self.extruder_points)
         hull = ConvexHull(points)
-        
-        self._logger.info("Found Convex Hull")
         
         overlay_img = io.BytesIO()
 
