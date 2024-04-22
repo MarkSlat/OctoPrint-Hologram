@@ -399,121 +399,89 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
         return line
     
-    def create_render(self, layer=-1):        
+    def create_render(self, layer=-1):
         gcode_R = gcode_reader.GcodeReader(self.gcode_path)
-        
-        # Define getter function
-        def get_layer(self):
-            return self.n_layers + 1
 
-        def get_limits(self):
-            return self.xyzlimits
-        
-        # Inject the getter function
-        gcode_reader.GcodeReader.get_layer = get_layer
-        
-        gcode_reader.GcodeReader.get_limits = get_limits
-        
+        # Inject the getter functions directly into GcodeReader class
+        gcode_reader.GcodeReader.get_layer = lambda self: self.n_layers + 1
+        gcode_reader.GcodeReader.get_limits = lambda self: self.xyzlimits
+
         _, _, _, _, _, self.max_height = gcode_R.get_limits()
-        
         self.max_layer = gcode_R.get_layer()
-        
+
+        self._logger.info(f"Max layers {self.max_layer}")
+
         if layer == -1 or layer > self.max_layer:
             layer = self.max_layer
-        
+
+        self._logger.info(f"Using layer {layer}")
+
         color = self._settings.get(["colorHex"])
-        
         fig, ax = gcode_R.plot_layers(min_layer=1, max_layer=layer, color=color)
-        
-        v = self._settings.get(["slider_values"])
-        v = [float(val) for val in v]
+
+        v = [float(val) for val in self._settings.get(["slider_values"])]
 
         # Set axis limits and view
         printer_length = int(self._settings.get(["printerLength"]))
         printer_width = int(self._settings.get(["printerWidth"]))
         printer_depth = int(self._settings.get(["printerDepth"]))
-        
-        # Calculate required aspect ratio for equal scaling
+
         max_range = max(printer_length, printer_width, printer_depth)
-        ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
-        
+        ax.set_box_aspect([printer_length / max_range, printer_width / max_range, printer_depth / max_range])
+
         ax.set_xlim(0, printer_length)
         ax.set_ylim(0, printer_width)
         ax.set_zlim(0, printer_depth)
         ax.view_init(elev=v[0], azim=v[1], roll=v[2])
-
         ax.set_proj_type(proj_type='persp', focal_length=v[3])
 
-        x_input = printer_length/2
-        y_input = printer_width/2
-        z_input = 0
-
         ax.set_axis_off()
+        pixel_coords = utils.get_pixel_coords(ax, printer_length / 2, printer_width / 2, 0)
 
-        pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
-        
+        if layer != self.max_layer:  # Skip masking for the maximum layer
+            self._logger.info("Applying mask for extruder points")
+            self.apply_mask(ax, fig, layer)
+
+        overlay_img = io.BytesIO()
+        fig.savefig(overlay_img, format='png', transparent=True)
+        plt.close()
+
+        overlay_img.seek(0)
+        return overlay_img, pixel_coords
+
+    def apply_mask(self, ax, fig, layer):
         extruder_X = self._settings.get(["extruder_X"])
         extruder_Y = self._settings.get(["extruder_Y"])
         extruder_Z = self._settings.get(["extruder_Z"])
 
-        # Generate all 8 points of the cuboid
         points = [
             (self.current_position["X"] + dx, self.current_position["Y"] + dy, self.current_position["Z"] + dz)
             for dx in extruder_X
             for dy in extruder_Y
             for dz in extruder_Z
         ]
-        
+
         self.extruder_points = [utils.get_pixel_coords(ax, *point) for point in points]
         
         points = np.array(self.extruder_points)
         hull = ConvexHull(points)
         
         overlay_img = io.BytesIO()
-
         fig.savefig(overlay_img, format='png', transparent=True)
-
-        plt.close()
-
         overlay_img.seek(0)
         
-        self.roi_coords = utils.find_non_transparent_roi(overlay_img)
+        image_pil = Image.open(overlay_img).convert("RGBA")
         
-        overlay_img.seek(0)
-        
-        # Load the image
-        overlay_img.seek(0)  # Ensure we're at the start of the BytesIO object
-        image_pil = Image.open(overlay_img).convert("RGBA")  # Ensure image is in RGBA mode for transparency
-
-        # Create a mask image of the same size, filled with the 'transparent' color
-        mask_img = Image.new('L', image_pil.size, 0)  # 'L' mode for a single channel image
+        mask_img = Image.new('L', image_pil.size, 0)
         draw = ImageDraw.Draw(mask_img)
-
-        # Draw the polygon on the mask image based on the hull vertices
         draw.polygon([tuple(points[vertex]) for vertex in hull.vertices], fill=255)
-
-        # Apply the mask to the image
-        transparent_area = Image.new('RGBA', image_pil.size, (0,0,0,0))  # An image filled with transparency
+        
+        transparent_area = Image.new('RGBA', image_pil.size, (0, 0, 0, 0))
         image_pil.paste(transparent_area, mask=mask_img)
-
-        # If needed, save the modified image back to a BytesIO object for further processing
+        
         overlay_img_modified = io.BytesIO()
         image_pil.save(overlay_img_modified, format='PNG')
-        overlay_img_modified.seek(0)  # Rewind to the start of the BytesIO object
-        
-        # image_pil = Image.open(overlay_img)
-
-        # Ensure debug folder exists
-        # debug_folder = "C:\\Users\\mark-\\AppData\\Roaming\\OctoPrint\\data\\hologram\\debug"
-        # if not os.path.exists(debug_folder):
-        #     os.makedirs(debug_folder)
-
-        # # Save the PIL Image to the file
-        # image_pil.save(os.path.join(debug_folder, f"overlay_layer_{layer}.png"), "PNG")
-        
-        overlay_img.seek(0)
-        
-        return overlay_img_modified, pixel_coords
+        overlay_img_modified.seek(0)
     
     def simm_compare(self, layer):      
         # Fetch base snapshot for overlay        
