@@ -64,7 +64,7 @@ $(function() {
         // Initialize the periodic update for the SSIM chart
         setInterval(function() {
             self.updateSsimChart(false); // Regular updates without forcing
-        }, 60000); // Update every 60 seconds
+        }, 120000); // Update every 120 seconds
 
         // Initial update on load
         self.updateSsimChart(true); // Force update on load
@@ -92,29 +92,29 @@ $(function() {
         };
 
         // Function to send extruder dimensions
-    self.sendExtruderDimensions = function() {
-        $.ajax({
-            url: API_BASEURL + "plugin/hologram",
-            type: "POST",
-            dataType: "json",
-            contentType: "application/json; charset=UTF-8",
-            data: JSON.stringify({
-                command: "update_extruder_dimensions",
-                extruderXMin: self.extruderXMin(),
-                extruderXMax: self.extruderXMax(),
-                extruderYMin: self.extruderYMin(),
-                extruderYMax: self.extruderYMax(),
-                extruderZMin: self.extruderZMin(),
-                extruderZMax: self.extruderZMax()
-            }),
-            success: function(response) {
-                console.log("Extruder dimensions updated successfully.");
-            },
-            error: function() {
-                console.error("Failed to update extruder dimensions.");
-            }
-        });
-    };
+        self.sendExtruderDimensions = function() {
+            $.ajax({
+                url: API_BASEURL + "plugin/hologram",
+                type: "POST",
+                dataType: "json",
+                contentType: "application/json; charset=UTF-8",
+                data: JSON.stringify({
+                    command: "update_extruder_dimensions",
+                    extruderXMin: self.extruderXMin(),
+                    extruderXMax: self.extruderXMax(),
+                    extruderYMin: self.extruderYMin(),
+                    extruderYMax: self.extruderYMax(),
+                    extruderZMin: self.extruderZMin(),
+                    extruderZMax: self.extruderZMax()
+                }),
+                success: function(response) {
+                    console.log("Extruder dimensions updated successfully.");
+                },
+                error: function() {
+                    console.error("Failed to update extruder dimensions.");
+                }
+            });
+        };
 
         // Fetch a snapshot from the server
         self.getSnapshot = function() {
@@ -330,7 +330,7 @@ $(function() {
         };
 
     }
-
+    
     // Register the ViewModel with OctoPrint's ViewModel system
     OCTOPRINT_VIEWMODELS.push({
         construct: HologramViewModel,

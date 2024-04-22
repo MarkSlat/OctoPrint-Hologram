@@ -8,6 +8,11 @@
     width: 640px; 
     height: 480px;
 }
+#preview-container {
+    position: relative;
+    width: 584px; 
+    height: 438px;
+}
 #hologram-snapshot, #overlay-canvas {
     position: absolute;
     top: 0;

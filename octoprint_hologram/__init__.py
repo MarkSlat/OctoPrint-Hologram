@@ -132,7 +132,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
                 plt.figure(figsize=(10, 5))
                 plt.plot(self.ssim_scores, marker='o', linestyle='-', color='g')
-                plt.title('SSIM Scores')
+                plt.title(f'SSIM Scores for', path)
                 plt.xlabel('Observation Number')
                 plt.ylabel('SSIM Score')
                 plt.grid(True)
@@ -418,12 +418,8 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         self.max_layer = gcode_R.get_layer()
         
-        self._logger.info("Max layers {}".format(self.max_layer))
-        
         if layer == -1 or layer > self.max_layer:
             layer = self.max_layer
-        
-        self._logger.info("Using layer {}".format(layer))
         
         color = self._settings.get(["colorHex"])
         
@@ -455,8 +451,6 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         ax.set_axis_off()
 
         pixel_coords = utils.get_pixel_coords(ax, x_input, y_input, z_input)
-        
-        self._logger.info("Translating points")
         
         extruder_X = self._settings.get(["extruder_X"])
         extruder_Y = self._settings.get(["extruder_Y"])
@@ -521,9 +515,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         return overlay_img_modified, pixel_coords
     
-    def simm_compare(self, layer):
-        self._logger.info("Layer: {}".format(layer))
-        
+    def simm_compare(self, layer):      
         # Fetch base snapshot for overlay        
         image_data = self.take_snapshot(save=False)
         
@@ -573,11 +565,11 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         cropped_result_image.save(os.path.join(debug_folder, f"result_layer_{layer}.png"), "PNG")
 
         # Calculate SSIM on the cropped images
-        temp = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)
+        score = utils.calculate_ssim(cropped_result_image, cropped_snapshot_path)
         
-        self._logger.info("SSIM: {}".format(temp))
+        self._logger.info("SSIM: {}".format(score))
         
-        return temp
+        return score
 
 
     def get_update_information(self):
