@@ -104,8 +104,8 @@ def center_of_quadrilateral(points):
     
     return (intersection_x, intersection_y)
 
-def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale=1.0):
-    scale = math.sqrt(scale ** 2 / 2)
+def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale):
+    # scale = math.sqrt(scale ** 2 / 2)
     
     # Load the overlay image and scale it, ensuring it is in RGBA mode
     overlay_image_original = Image.open(overlay_path).convert("RGBA")
@@ -140,7 +140,8 @@ def translate_overlay_point(x_overlay, y_overlay, base_anchor, overlay_anchor, s
     """
 
     # Adjust the scale to consider diagonal scaling
-    scale_adjusted = math.sqrt(scale ** 2 / 2)
+    # scale_adjusted = math.sqrt(scale ** 2 / 2)
+    scale_adjusted = scale
 
     # Calculate the scaled anchor position
     overlay_anchor_scaled_x = overlay_anchor[0] * scale_adjusted
@@ -223,7 +224,7 @@ def find_non_transparent_roi(image_path):
 
 def optimize_projection(converted_quad, printer_dimensions):
     # Define bounds and initial parameters
-    bounds = [(-30, 120), (-180, 180), (-15, 15), (0.075, 1), (0.2, 3)]
+    bounds = [(-30, 120), (-180, 180), (-15, 15), (0.075, 1), (0.2, 4)]
     initial_params = [90, -90, 0, 1, 1]
     
     # Define the error computation function
@@ -276,7 +277,7 @@ def optimize_projection(converted_quad, printer_dimensions):
 
     # Execute basinhopping
     minimizer_kwargs = {"method": "L-BFGS-B", "bounds": bounds}
-    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=6, stepsize=0.5)
+    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=10, stepsize=0.5)
     
     # Extract optimized parameters
     elevation, azimuth, roll, focal_length, scale = result.x
