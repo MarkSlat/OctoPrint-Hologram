@@ -132,7 +132,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
 
                 plt.figure(figsize=(10, 5))
                 plt.plot(self.ssim_scores, marker='o', linestyle='-', color='g')
-                plt.title(f'SSIM Scores for', path)
+                plt.title(f'SSIM Scores for {path}')
                 plt.xlabel('Observation Number')
                 plt.ylabel('SSIM Score')
                 plt.grid(True)
