@@ -105,7 +105,7 @@ def center_of_quadrilateral(points):
     return (intersection_x, intersection_y)
 
 def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale):
-    # scale = math.sqrt(scale ** 2 / 2)
+    scale = math.sqrt(scale ** 2 / 2)
     
     # Load the overlay image and scale it, ensuring it is in RGBA mode
     overlay_image_original = Image.open(overlay_path).convert("RGBA")
@@ -140,8 +140,8 @@ def translate_overlay_point(x_overlay, y_overlay, base_anchor, overlay_anchor, s
     """
 
     # Adjust the scale to consider diagonal scaling
-    # scale_adjusted = math.sqrt(scale ** 2 / 2)
-    scale_adjusted = scale
+    scale_adjusted = math.sqrt(scale ** 2 / 2)
+    # scale_adjusted = scale
 
     # Calculate the scaled anchor position
     overlay_anchor_scaled_x = overlay_anchor[0] * scale_adjusted

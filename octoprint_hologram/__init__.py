@@ -268,7 +268,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         snapshot_img = Image.open(snapshot_path).convert("RGBA")
         
-        result_image = utils.overlay_images(snapshot_img, arrow_img, base_anchor, pixel_coords, scale=values[4])
+        result_image = utils.overlay_images(snapshot_img, arrow_img, base_anchor, pixel_coords, scale=(math.sqrt(values[4] ** 2 / 2)))
 
         rgb_image = Image.new("RGB", result_image.size)
 
