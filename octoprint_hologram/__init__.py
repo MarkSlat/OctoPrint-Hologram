@@ -450,10 +450,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         return overlay_img, pixel_coords
 
     def apply_mask(self, ax, fig, layer):
-        extruder_X = self._settings.get(["extruder_X"])
-        extruder_Y = self._settings.get(["extruder_Y"])
-        extruder_Z = self._settings.get(["extruder_Z"])
-
+        extruder_X = float(self._settings.get(["extruder_X"]))
+        extruder_Y = float(self._settings.get(["extruder_Y"]))
+        extruder_Z = float(self._settings.get(["extruder_Z"]))
+        
         points = [
             (self.current_position["X"] + dx, self.current_position["Y"] + dy, self.current_position["Z"] + dz)
             for dx in extruder_X
