@@ -445,6 +445,10 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         overlay_img = io.BytesIO()
         fig.savefig(overlay_img, format='png', transparent=True)
         plt.close()
+        
+        overlay_img.seek(0)
+        
+        self.roi_coords = utils.find_non_transparent_roi(overlay_img)
 
         overlay_img.seek(0)
         return overlay_img, pixel_coords
