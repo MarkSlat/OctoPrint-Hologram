@@ -2,9 +2,8 @@ import base64
 import io
 import math
 import os
-import matplotlib
+import matplotlib; matplotlib.use('Agg')
 import numpy as np
-matplotlib.use('Agg')
 from io import BytesIO
 from matplotlib import pyplot as plt
 from octoprint.events import Events
@@ -268,7 +267,7 @@ class HologramPlugin(octoprint.plugin.StartupPlugin,
         
         snapshot_img = Image.open(snapshot_path).convert("RGBA")
         
-        result_image = utils.overlay_images(snapshot_img, arrow_img, base_anchor, pixel_coords, scale=(math.sqrt(values[4] ** 2 / 2)))
+        result_image = utils.overlay_images(snapshot_img, arrow_img, base_anchor, pixel_coords, scale=(math.sqrt(2) * values[4]))
 
         rgb_image = Image.new("RGB", result_image.size)
 

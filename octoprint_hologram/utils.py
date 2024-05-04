@@ -1,9 +1,9 @@
 import io
 import math
-import matplotlib
-matplotlib.use('Agg')
+import matplotlib; matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
@@ -233,6 +233,7 @@ def optimize_projection(converted_quad, printer_dimensions):
         
         # Set up the 3D plot
         fig = plt.figure()
+        canvas = FigureCanvas(fig)
         ax = fig.add_subplot(111, projection='3d')
         
         # Unpack printer dimensions
@@ -246,6 +247,8 @@ def optimize_projection(converted_quad, printer_dimensions):
         ax.set_zlim(0, printer_depth)
         ax.set_proj_type(proj_type='persp', focal_length=focal_length)
         ax.view_init(elev=elevation, azim=azimuth, roll=roll)
+        
+        canvas.draw()
         
         # Compute pixel coordinates
         corner_pixels = []
