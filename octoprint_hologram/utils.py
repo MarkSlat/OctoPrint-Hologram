@@ -280,7 +280,7 @@ def optimize_projection(converted_quad, printer_dimensions):
 
     # Execute basinhopping
     minimizer_kwargs = {"method": "L-BFGS-B", "bounds": bounds}
-    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=10, stepsize=0.5)
+    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=4, stepsize=0.5)
     
     # Extract optimized parameters
     elevation, azimuth, roll, focal_length, scale = result.x
