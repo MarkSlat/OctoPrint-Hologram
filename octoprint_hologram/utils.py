@@ -226,62 +226,68 @@ def optimize_projection(converted_quad, printer_dimensions):
     # Define bounds and initial parameters
     bounds = [(-30, 120), (-180, 180), (-15, 15), (0.075, 1), (0.2, 4)]
     initial_params = [90, -90, 0, 1, 1]
+
+    # Set up the 3D plot
+    fig = plt.figure()
+    canvas = FigureCanvas(fig)
+    ax = fig.add_subplot(111, projection='3d')
     
+    # Unpack printer dimensions
+    printer_length, printer_width, printer_depth = printer_dimensions
+    
+    # Set 3D box aspect and axis limits
+    max_range = np.max([printer_length, printer_width, printer_depth])
+    ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
+    ax.set_xlim(0, printer_length)
+    ax.set_ylim(0, printer_width)
+    ax.set_zlim(0, printer_depth)
+
     # Define the error computation function
     def compute_error(params):
         elevation, azimuth, roll, focal_length, scale = np.clip(params, [b[0] for b in bounds], [b[1] for b in bounds])
         
-        # Set up the 3D plot
-        fig = plt.figure()
-        canvas = FigureCanvas(fig)
-        ax = fig.add_subplot(111, projection='3d')
-        
-        # Unpack printer dimensions
-        printer_length, printer_width, printer_depth = printer_dimensions
-        
-        # Set 3D box aspect and axis limits
-        max_range = np.max([printer_length, printer_width, printer_depth])
-        ax.set_box_aspect([printer_length/max_range, printer_width/max_range, printer_depth/max_range])
-        ax.set_xlim(0, printer_length)
-        ax.set_ylim(0, printer_width)
-        ax.set_zlim(0, printer_depth)
         ax.set_proj_type(proj_type='persp', focal_length=focal_length)
         ax.view_init(elev=elevation, azim=azimuth, roll=roll)
-        
+
         canvas.draw()
-        
+
         # Compute pixel coordinates
         corner_pixels = []
         corners = [(0, printer_length, 0), (printer_width, printer_length, 0), (printer_width, 0, 0), (0, 0, 0)]
         base_anchor = center_of_quadrilateral(converted_quad)
         center_pixel = get_pixel_coords(ax, printer_length/2, printer_width/2, 0)
-        
+
         displacement_x = base_anchor[0] - center_pixel[0]
         displacement_y = base_anchor[1] - center_pixel[1]
-        
+
         for corner in corners:
             pixel = get_pixel_coords(ax, *corner)
             x_final = displacement_x + pixel[0]
             y_final = displacement_y + pixel[1]
-            
+
             scaled_x = base_anchor[0] + scale * (x_final - base_anchor[0])
             scaled_y = base_anchor[1] + scale * (y_final - base_anchor[1])
             scaled_point = (scaled_x, scaled_y)
             corner_pixels.append(scaled_point)
-        
+
         plt.close(fig)
-        
+
         # Calculate the error metric (sum of squared distances)
         error = 0
         for cp, gq in zip(corner_pixels, converted_quad):
             error += (cp[0] - gq[0])**2 + (cp[1] - gq[1])**2
-        
+
         return error
 
-    # Execute basinhopping
+    # Callback function to stop optimization when the error is less than 1
+    def callback(x, f, accept):
+        if f < 1:
+            return True
+
+    # Execute basinhopping with the callback
     minimizer_kwargs = {"method": "L-BFGS-B", "bounds": bounds}
-    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=4, stepsize=0.5)
-    
+    result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=5, stepsize=0.5, callback=callback)
+
     # Extract optimized parameters
     elevation, azimuth, roll, focal_length, scale = result.x
     return elevation, azimuth, roll, focal_length, scale
