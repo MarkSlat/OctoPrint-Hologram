@@ -1,14 +1,7 @@
 <div id="settings_plugin_hologram" class="tab-pane">
-    <div>
-        <h3>Hologram settings</h3>
-    </div>
 
     <div>
-        <h4>Set Filament Color</h4>
-        <div>
-            <input type="color" data-bind="value: colorHex">
-        </div>
-        <button data-bind="click: updateColor">Update Color</button>
+        <h3>Hologram settings</h3>
     </div>
 
     <div>
@@ -20,29 +13,9 @@
         <div>Depth: <input type="number" step="1" data-bind="value: printerDepth"></div>
         <button data-bind="click: sendPrinterDimensions">Update Dimensions</button>
     </div>
-
+    
     <br>
 
-    <div>
-        <h4>Printer Head (Extruder) Dimensions</h4>
-        <span>Note: X, Y, Z extruder housing relative to the nozel</span>
-        <br>
-        <div>X Axis (-X to +X):
-            <input type="number" step="1" data-bind="value: extruderXMin" placeholder="Min X">
-            <input type="number" step="1" data-bind="value: extruderXMax" placeholder="Max X">
-        </div>
-        <div>Y Axis (-Y to +Y):
-            <input type="number" step="1" data-bind="value: extruderYMin" placeholder="Min Y">
-            <input type="number" step="1" data-bind="value: extruderYMax" placeholder="Max Y">
-        </div>
-        <div>Z Axis (-Z to +Z):
-            <input type="number" step="1" data-bind="value: extruderZMin" placeholder="Min Z">
-            <input type="number" step="1" data-bind="value: extruderZMax" placeholder="Max Z">
-        </div>
-        <button data-bind="click: sendExtruderDimensions">Update Extruder Dimensions</button>
-    </div>
-
-    <br>
     <div>
         <h4>Select Plate</h4>
         <span>Please drag the box over the plate</span>
@@ -57,12 +30,15 @@
                 mouseout: mouseUp
             }" style="position: absolute; top: 0; left: 0; width: 100%; pointer-events: auto;"></canvas>
         </div>
+        <span>Locking in the build plate will start the auto-calibration, which may take a few minutes. An alert will be sent when completed.</span>
+        <br>
         <button data-bind="click: savePoints">Lock in Plate Area</button>
     </div>
 
     <br>
 
     <h4>Image Adjustments</h4>
+    <span>Note: Make sure the arrow points to the origin</span>
     <div class="adjustment-sliders">
         
         <div class="slider-container">
@@ -91,13 +67,5 @@
         </div>
 
     </div>
-    
-    <div>
-        <h4>Enhanced Hologram Mode</h4>
-        <label>
-            <input type="checkbox" data-bind="checked: enhancedMode">
-            Enable Enhanced Mode
-        </label>
-        <button data-bind="click: sendEnhancedMode">Update Mode</button>
-    </div>
+
 </div>

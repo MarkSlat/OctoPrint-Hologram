@@ -2,14 +2,10 @@
     <h3>Hologram Tab</h3>
     <h4>Gcode Preview</h4>
     <button data-bind="click: fetchRender">Fetch and Render Image</button>
+    <span>(Rendering may take a minute to complete.)</span>
     <div id="preview-container" style="position: relative;">
         <div data-bind="visible: displayImageUrl">
             <img data-bind="attr: { src: displayImageUrl }" />
         </div>
-    </div>
-    <h4>SSIM chart</h4>
-    <div>
-        <img data-bind="attr: { src: ssimChartUrl }" alt="SSIM Chart"/>
-    </div>
-    
+    </div>    
 </div>
