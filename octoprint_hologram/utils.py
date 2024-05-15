@@ -105,8 +105,6 @@ def center_of_quadrilateral(points):
     return (intersection_x, intersection_y)
 
 def overlay_images(base_path, overlay_path, base_anchor, overlay_anchor, scale):
-    scale = math.sqrt(scale ** 2 / 2)
-    
     # Load the overlay image and scale it, ensuring it is in RGBA mode
     overlay_image_original = Image.open(overlay_path).convert("RGBA")
     overlay_width_scaled, overlay_height_scaled = [int(scale * s) for s in overlay_image_original.size]
@@ -270,8 +268,6 @@ def optimize_projection(converted_quad, printer_dimensions):
             scaled_point = (scaled_x, scaled_y)
             corner_pixels.append(scaled_point)
 
-        plt.close(fig)
-
         # Calculate the error metric (sum of squared distances)
         error = 0
         for cp, gq in zip(corner_pixels, converted_quad):
@@ -287,7 +283,9 @@ def optimize_projection(converted_quad, printer_dimensions):
     # Execute basinhopping with the callback
     minimizer_kwargs = {"method": "L-BFGS-B", "bounds": bounds}
     result = basinhopping(compute_error, initial_params, minimizer_kwargs=minimizer_kwargs, niter=5, stepsize=0.5, callback=callback)
-
+    
+    plt.close(fig)
+    
     # Extract optimized parameters
     elevation, azimuth, roll, focal_length, scale = result.x
     return elevation, azimuth, roll, focal_length, scale
