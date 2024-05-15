@@ -50,7 +50,7 @@ PLOT_SUPPORT = True
 
 # set true to use one color for plot
 # set false to use random color for plot
-SINGLE_COLOR = True
+SINGLE_COLOR = False
 
 # set true to plot scans with positive power in different color
 # this is for powder bed fusion
