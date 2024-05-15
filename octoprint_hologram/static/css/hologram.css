@@ -2,16 +2,19 @@
     position: relative;
     width: 640px; /* Adjust width as necessary to fit your image */
     height: 480px; /* Adjust height as necessary */
+    background-color: #D3D3D3;
 }
 #updated-image-container {
     position: relative;
     width: 640px; 
     height: 480px;
+    background-color: #D3D3D3;
 }
 #preview-container {
     position: relative;
     width: 584px; 
     height: 438px;
+    background-color: #D3D3D3;
 }
 #hologram-snapshot, #overlay-canvas {
     position: absolute;
