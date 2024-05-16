@@ -5,14 +5,17 @@ This plugin allows a user to an accurate preview of their print projected onto t
 Example Usage
 -------------
 Generate a render by loading the print file, clicking the render button and it overlays a render onto the build plate.
+
 ![demo](assets/demo.jpeg)
 
 Setup
 -----
 Position the box over the build plate and secure it to initiate the calibration process.
+
 ![setup_1](assets/setup_1.gif)
 
 Make any necessary adjustments. Ensure the arrow points towards the origin.
+
 ![setup_2](assets/setup_2.gif)
 
 Raspberry Pi
