@@ -1,17 +1,14 @@
 import base64
 import io
-import math
 import os
 import matplotlib; matplotlib.use('Agg')
-import numpy as np
 from io import BytesIO
 from matplotlib import pyplot as plt
 from octoprint.events import Events
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image
 import flask
 import octoprint.plugin
-from scipy.spatial import ConvexHull
 
 from octoprint_hologram import utils, gcode_reader
 

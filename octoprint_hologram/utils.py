@@ -1,14 +1,10 @@
 import io
-import math
 import matplotlib; matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
 import numpy as np
-from skimage.metrics import structural_similarity as ssim
-from skimage.io import imread
-from skimage.color import rgb2gray
 from scipy.optimize import basinhopping
 
 def get_pixel_coords(ax, x, y, z):
