@@ -236,7 +236,7 @@ $(function() {
                 },
                 error: function(xhr, status, error) {
                     console.error("Failed to send G-code file to the backend:", status, error);
-                    alert("Failed to get render plase make sure you have slected a job");
+                    alert("Failed to get render please make sure you have selected a job.");
                 }
             });
         };
