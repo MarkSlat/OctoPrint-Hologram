@@ -12,7 +12,7 @@ plugin_url = "https://github.com/MarkSlat/OctoPrint-Hologram"
 plugin_license = "AGPLv3"
 plugin_requires = ["Pillow",
                    "matplotlib",
-                   "numpy",
+                   "numpy<=1.25.2",
                    "pandas",
                    "scipy"]
 
